@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Github, ExternalLink } from "lucide-react";
+import { Github, ExternalLink, Folder } from "lucide-react";
 
 const projects = [
   {
@@ -17,8 +17,10 @@ export function ProjectsSection() {
     <section className="w-full py-20 px-4">
       <div className="max-w-6xl mx-auto">
         <div className="mb-12">
-          <h2 className="text-4xl font-bold text-foreground mb-4">My Projects</h2>
-          <p className="text-muted-foreground text-lg">A selection of personal projects I've built and contributed to</p>
+          <h2 className="text-4xl font-bold text-foreground mb-4 flex items-center gap-3">
+            <Folder size={36} />
+            My Projects
+          </h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
