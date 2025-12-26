@@ -17,25 +17,40 @@ jobs:
           username: ${{ secrets.GCP_USERNAME }}
           key: ${{ secrets.GCP_SSH_KEY }}
           script: |
-            # 1. Add Swap if it doesn't exist (prevents crashes on 1GB RAM)
+            # 1. Install Git if missing
+            if ! command -v git &> /dev/null; then
+              sudo apt-get update && sudo apt-get install -y git
+            fi
+
+            # 2. Install Bun if missing
+            if ! [ -d "$HOME/.bun" ]; then
+              curl -fsSL https://bun.sh/install | bash
+            fi
+            export PATH="$HOME/.bun/bin:$PATH"
+
+            # 3. Install PM2 and Node (needed for PM2) if missing
+            if ! command -v pm2 &> /dev/null; then
+              sudo apt-get update && sudo apt-get install -y nodejs npm
+              sudo npm install -g pm2
+            fi
+
+            # 4. Handle Swap (Prevents 1GB RAM crashes)
             if [ ! -f /swapfile ]; then
               sudo fallocate -l 2G /swapfile
               sudo chmod 600 /swapfile
               sudo mkswap /swapfile
               sudo swapon /swapfile
+              echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
             fi
 
-            # 2. Setup Bun path
-            export PATH="$HOME/.bun/bin:$PATH"
-
-            # 3. App Deployment
+            # 5. App Deployment
             mkdir -p ~/my-app
             cd ~/my-app
             if [ ! -d ".git" ]; then
               git clone https://github.com/${{ github.repository }} .
+            else
+              git pull origin main
             fi
-            git pull origin main
             
             bun install
-            # Restart with PM2 to keep it alive forever
             pm2 restart my-app || pm2 start "bun start" --name "my-app"

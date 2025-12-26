@@ -24,6 +24,10 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .env.production
 /env/*
 
+# SSH Keys
+gcp_deploy_key
+gcp_deploy_key.pub
+
 # caches
 .eslintcache
 .cache
