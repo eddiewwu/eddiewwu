@@ -4,7 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import { ThemeProvider } from "./components/theme-provider";
 import { Header } from "./components/layout/header";
 import { Footer } from "./components/layout/footer";
-import { Home } from "./pages/home";
+import { Home } from "./pages/Home";
 import { AuthCallback } from "./pages/auth-callback";
 import { useAuth } from "./hooks/useAuth";
 
