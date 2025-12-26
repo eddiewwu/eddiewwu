@@ -1,0 +1,41 @@
+name: Free Permanent Deploy
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy to Free GCP VM
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.GCP_HOST }}
+          username: ${{ secrets.GCP_USERNAME }}
+          key: ${{ secrets.GCP_SSH_KEY }}
+          script: |
+            # 1. Add Swap if it doesn't exist (prevents crashes on 1GB RAM)
+            if [ ! -f /swapfile ]; then
+              sudo fallocate -l 2G /swapfile
+              sudo chmod 600 /swapfile
+              sudo mkswap /swapfile
+              sudo swapon /swapfile
+            fi
+
+            # 2. Setup Bun path
+            export PATH="$HOME/.bun/bin:$PATH"
+
+            # 3. App Deployment
+            mkdir -p ~/my-app
+            cd ~/my-app
+            if [ ! -d ".git" ]; then
+              git clone https://github.com/${{ github.repository }} .
+            fi
+            git pull origin main
+            
+            bun install
+            # Restart with PM2 to keep it alive forever
+            pm2 restart my-app || pm2 start "bun start" --name "my-app"
