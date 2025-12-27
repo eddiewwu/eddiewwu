@@ -4,4 +4,4 @@ env = "BUN_PUBLIC_*"
 
 # Env Var:
 [env]
-files = ["./env/.env", "./env/.env.production"]
+files = [".env", ".env.production"]

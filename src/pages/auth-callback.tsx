@@ -10,9 +10,7 @@ export function AuthCallback() {
     const authenticate = async () => {
       try {
         // THIS CALLS parseOAuthCallback() ← THIS IS THE KEY!
-        const { code, error, provider } = parseOAuthCallback();
-
-        console.log("Parsed callback:", { code, error, provider });
+        const { code, error, provider } = await parseOAuthCallback();
 
         if (error) {
           console.error("OAuth error:", error);
@@ -33,8 +31,10 @@ export function AuthCallback() {
           await handleGithubCallback(code);
         }
 
-        // Success! Redirect home
-        navigate("/");
+        // SUCCESS! Tell the rest of the app to refresh auth state
+        window.dispatchEvent(new Event("auth-change"));
+
+        navigate("/", { replace: true });
       } catch (err) {
         console.error("Authentication failed:", err);
         navigate("/login");

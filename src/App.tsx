@@ -9,12 +9,11 @@ import { AuthCallback } from "./pages/auth-callback";
 import { useAuth } from "./hooks/useAuth";
 
 export function App() {
-  const { user, logout } = useAuth();
 
   return (
     <Router>
       <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-        <Header user={user} onLogout={logout} />
+        <Header />
 
           <main className="flex-1">
             <Routes>

@@ -8,17 +8,13 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { Spinner } from "../ui/spinner";
+import { useAuth } from "@/hooks/useAuth";
 
 interface UserProfile {
   name: string;
   email: string;
   avatar?: string;
-}
-
-interface LoginProps {
-  user?: UserProfile | null;
-  onLogin?: () => void;
-  onLogout?: () => void;
 }
 
 const OAUTH_CONFIG = {
@@ -40,16 +36,17 @@ const OAUTH_CONFIG = {
  * Login dropdown component for header
  * Shows user menu when logged in, OAuth options when logged out
  */
-export function Login({ user, onLogin, onLogout }: LoginProps) {
-  const [isLoading, setIsLoading] = useState(false);
+export function Login() {
+  const { user, logout } = useAuth();
+  const [loadingUser, setLoadingUser] = useState(false);
 
   const handleOAuthLogin = (provider: "google" | "github") => {
-    setIsLoading(true);
+    setLoadingUser(true);
     const config = OAUTH_CONFIG[provider];
 
     if (!config.clientId) {
       console.error(`OAuth ${provider} client ID not configured`);
-      setIsLoading(false);
+      setLoadingUser(false);
       return;
     }
 
@@ -65,9 +62,19 @@ export function Login({ user, onLogin, onLogout }: LoginProps) {
   };
 
   const handleLogout = () => {
-    setIsLoading(true);
-    onLogout?.();
-    setIsLoading(false);
+    setLoadingUser(true);
+    logout();
+    setLoadingUser(false);
+  };
+
+  if (loadingUser) {
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Spinner />
+        </DropdownMenuTrigger>
+      </DropdownMenu>
+    )
   };
 
   if (!user) {
@@ -84,7 +91,7 @@ export function Login({ user, onLogin, onLogout }: LoginProps) {
           <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={() => handleOAuthLogin("google")}
-            disabled={isLoading}
+            disabled={loadingUser}
             className="flex items-center gap-2 cursor-pointer"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -131,7 +138,7 @@ export function Login({ user, onLogin, onLogout }: LoginProps) {
           <p className="text-xs leading-none text-muted-foreground truncate">{user.email}</p>
         </div>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleLogout} disabled={isLoading}>
+        <DropdownMenuItem onClick={handleLogout} disabled={loadingUser}>
           <LogOut className="mr-2 h-4 w-4" />
           <span>Sign out</span>
         </DropdownMenuItem>

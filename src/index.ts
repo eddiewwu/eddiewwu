@@ -6,27 +6,6 @@ const server = serve({
     // Serve index.html for all unmatched routes.
     "/*": index,
 
-    "/api/hello": {
-      async GET(req) {
-        return Response.json({
-          message: "Hello, world!",
-          method: "GET",
-        });
-      },
-      async PUT(req) {
-        return Response.json({
-          message: "Hello, world!",
-          method: "PUT",
-        });
-      },
-    },
-
-    "/api/hello/:name": async req => {
-      const name = req.params.name;
-      return Response.json({
-        message: `Hello, ${name}!`,
-      });
-    },
     "/api/auth/google/callback": {
       async POST(req) {
         const { code } = await req.json();
@@ -43,7 +22,6 @@ const server = serve({
             grant_type: "authorization_code",
           }),
         });
-        console.log("Token response:", tokenRes);
         const tokenData = await tokenRes.json();
 
         // 2. Get user profile

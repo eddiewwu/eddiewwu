@@ -1,21 +1,15 @@
-# bun-react-tailwind-shadcn-template
+# Personal Portfolio
 
-To install dependencies:
+Welcome to my portfolio!
 
-```bash
-bun install
-```
+To run this on your own clone this and do
 
-To start a development server:
+1. `bun install`
+2. Add in your env variables
+3. `bun run dev` or `bun start`
 
-```bash
-bun dev
-```
+## Lessons Learned
 
-To run for production:
-
-```bash
-bun start
-```
-
-This project was created using `bun init` in bun v1.3.5. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
+-   Ran into a State Sync Problem
+-   High level - Whenever Auth Callback completes, it navigates back to `/`, but since `App.tsx` was already mounted, it used the previous info and never knew the that the user was updated
+-   Added a dispatch event -> `auth-change` in order to tell the frontend if the user changed or not
