@@ -152,7 +152,7 @@ export function Login() {
           {user.avatar ? (
             <Avatar>
               <AvatarImage src={user.avatar} />
-              <AvatarFallback>CN</AvatarFallback>
+              <AvatarFallback>{user.name?.charAt(0) || "U"}</AvatarFallback>
             </Avatar>
           ) : (
             <User className="h-[1.2rem] w-[1.2rem]" />

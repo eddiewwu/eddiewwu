@@ -1,12 +1,14 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Briefcase, Calendar } from "lucide-react";
+import { Avatar, AvatarFallback } from "@radix-ui/react-avatar";
+import { AvatarImage } from "../ui/avatar";
 
 const workExperience = [
   {
+    avatar: "https://goodneighborcenter.statefarm.com/images/globals/sf-logo-nav.svg",
     company: "State Farm",
     position: "Software Engineer",
     duration: "Jun 2024 - Present",
-    description: "Software Engineer on the B2B Team responsible for customer-facing applications and internal tools.",
     responsibilities: [
       "Migrated 40+ Java enterprise applications from a legacy platform(Technical Platform) to AWS using Terraform and Kubernetes, enabling infrastructure automation and improving scalability within a 5 month timeframe.",
       "Developed 3 shared API library packages in Node.js and Java, adopted by 40+ applications, reducing code duplication by 30% and improving maintainability across 2 other teams.",
@@ -29,16 +31,20 @@ export function WorkSection() {
 
         <div className="space-y-6">
           {workExperience.map((job, index) => (
-            <Card 
-              key={index}
-              className="transition-all duration-300"
-            >
+            <Card key={index} className="transition-all duration-300">
               <CardHeader>
                 <div className="flex items-start justify-between">
-                  <div className="text-left">
-                    <CardTitle className="text-foreground text-2xl">{job.position}</CardTitle>
-                    <CardDescription className="text-base mt-1">{job.company}</CardDescription>
-                  </div>
+                    <div className="flex items-center gap-4"> 
+                      <Avatar className="h-12 w-12 shrink-0"> {/* Added size and shrink-0 */}
+                        <AvatarImage src={job.avatar} className="object-contain" />
+                        <AvatarFallback>{job.company[0]}</AvatarFallback>
+                      </Avatar>
+                      
+                      <div className="text-left">
+                        <CardTitle className="text-foreground text-2xl">{job.position}</CardTitle>
+                        <CardDescription className="text-base mt-1">{job.company}</CardDescription>
+                      </div>
+                    </div>
                   <div className="flex items-center gap-2 text-muted-foreground text-sm">
                     <Calendar size={16} />
                     {job.duration}
@@ -47,15 +53,11 @@ export function WorkSection() {
               </CardHeader>
 
               <CardContent className="space-y-4">
-                <p className="text-foreground text-left">{job.description}</p>
-                
                 <div>
                   <h4 className="text-foreground font-semibold mb-3 text-left">Key Responsibilities:</h4>
                   <ul className="space-y-2 text-left">
                     {job.responsibilities.map((responsibility, i) => (
-                      <li key={i}
-                        className="text-muted-foreground flex items-start gap-3"
-                      >
+                      <li key={i} className="text-muted-foreground flex items-start gap-3">
                         <span>• {responsibility}</span>
                       </li>
                     ))}
