@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { User, LogOut, LogIn, Github, Mail } from "lucide-react";
+import { User, LogOut, LogIn, } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,8 +11,8 @@ import {
 import { Spinner } from "../ui/spinner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
-import { auth, googleProvider } from "@/firebaseConfig";
-import { signInWithPopup, signInWithRedirect } from "firebase/auth";
+import { auth } from "@/firebaseConfig";
+import { signInWithPopup } from "firebase/auth";
 import { useEffect } from "react";
 import { getRedirectResult, GoogleAuthProvider } from "firebase/auth";
 
