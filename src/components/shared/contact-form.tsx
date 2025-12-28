@@ -8,7 +8,7 @@ import emailjs from "@emailjs/browser";
 
 // Initialize EmailJS with your public key
 // Get this from https://dashboard.emailjs.com/admin/account
-emailjs.init(process.env.BUN_PUBLIC_EMAIL_JS_PUBLIC_KEY as string);
+emailjs.init(import.meta.env.VITE_EMAIL_JS_PUBLIC_KEY as string);
 const COOLDOWN_DURATION = 60; // 60 seconds
 
 export function ContactForm() {
@@ -79,8 +79,8 @@ export function ContactForm() {
     try {
       // Send email using EmailJS
       const response = await emailjs.send(
-        process.env.BUN_PUBLIC_EMAIL_JS_SERVICE_ID as string,
-        process.env.BUN_PUBLIC_EMAIL_JS_TEMPLATE_ID as string,
+        import.meta.env.VITE_EMAIL_JS_SERVICE_ID as string,
+        import.meta.env.VITE_EMAIL_JS_TEMPLATE_ID as string,
         {
           to_email: "eddiewwu@gmail.com",
           name: formData.name,

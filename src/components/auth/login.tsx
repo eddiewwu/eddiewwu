@@ -9,7 +9,12 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Spinner } from "../ui/spinner";
-import { useAuth } from "@/hooks/useAuth";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+
+import { auth, googleProvider } from "@/firebaseConfig";
+import { signInWithPopup, signInWithRedirect } from "firebase/auth";
+import { useEffect } from "react";
+import { getRedirectResult, GoogleAuthProvider } from "firebase/auth";
 
 interface UserProfile {
   name: string;
@@ -17,54 +22,87 @@ interface UserProfile {
   avatar?: string;
 }
 
-const OAUTH_CONFIG = {
-  google: {
-    clientId: process.env.BUN_PUBLIC_GOOGLE_CLIENT_ID || "",
-    redirectUri: `${window.location.origin}/auth/callback/google`,
-    authEndpoint: "https://accounts.google.com/o/oauth2/v2/auth",
-    scopes: ["openid", "profile", "email"],
-  },
-//   github: {
-//     clientId: import.meta.env.VITE_GITHUB_CLIENT_ID || "",
-//     redirectUri: `${window.location.origin}/auth/callback/github`,
-//     authEndpoint: "https://github.com/login/oauth/authorize",
-//     scopes: ["user:email", "read:user"],
-//   },
-};
-
 /**
  * Login dropdown component for header
  * Shows user menu when logged in, OAuth options when logged out
  */
 export function Login() {
-  const { user, logout } = useAuth();
+  const [user, setUser] = useState(null as UserProfile | null);
   const [loadingUser, setLoadingUser] = useState(false);
 
-  const handleOAuthLogin = (provider: "google" | "github") => {
-    setLoadingUser(true);
-    const config = OAUTH_CONFIG[provider];
+  useEffect(() => {const initAuth = async () => {
+      try {
+        // 1. Check if we just returned from a redirect
+        const result = await getRedirectResult(auth);
+        if (result) {
+          const token = await result.user.getIdToken();
+          document.cookie = `token=${token}; path=/; Secure; SameSite=Strict`;
+          
+          setUser({
+            name: result.user.displayName || "No Name",
+            email: result.user.email || "No Email",
+            avatar: result.user.photoURL || undefined,
+          });
+        } 
+        
+        // 2. Also listen for existing sessions (e.g., on page refresh)
+        // This ensures the 'user' state stays populated if the user is already logged in
+        const { onAuthStateChanged } = await import("firebase/auth");
+        onAuthStateChanged(auth, (firebaseUser) => {
+          if (firebaseUser) {
+            setUser({
+              name: firebaseUser.displayName || "No Name",
+              email: firebaseUser.email || "No Email",
+              avatar: firebaseUser.photoURL || undefined,
+            });
+          } else {
+            setUser(null);
+          }
+          setLoadingUser(false);
+        });
 
-    if (!config.clientId) {
-      console.error(`OAuth ${provider} client ID not configured`);
+      } catch (error) {
+        console.error("Auth initialization error:", error);
+        setLoadingUser(false);
+      }
+    };
+
+    initAuth();
+  }, []);
+
+  const signInWithGoogle = async () => {setLoadingUser(true);
+    // If you prefer Redirect, uncomment this and remove Popup logic:
+    // await signInWithRedirect(auth, googleProvider);
+
+    try {
+      const userCred = await signInWithPopup(auth, new GoogleAuthProvider());
+      const token = await userCred.user.getIdToken();
+      document.cookie = `token=${token}; path=/; Secure; SameSite=Strict`;
+      
+      setUser({
+        name: userCred.user.displayName || "No Name",
+        email: userCred.user.email || "No Email",
+        avatar: userCred.user.photoURL || undefined,
+      });
+    } catch (error) {
+      console.error("Popup sign-in error:", error);
+    } finally {
       setLoadingUser(false);
-      return;
     }
-
-    const params = new URLSearchParams({
-      client_id: config.clientId,
-      redirect_uri: config.redirectUri,
-      response_type: "code",
-      scope: config.scopes.join(" "),
-      ...(provider === "google" && { access_type: "offline" }),
-    });
-
-    window.location.href = `${config.authEndpoint}?${params.toString()}`;
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setLoadingUser(true);
-    logout();
-    setLoadingUser(false);
+    try {
+      await auth.signOut(); // Best practice: Sign out of Firebase first
+      // Clear the cookie
+      document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; max-age=0";
+      setUser(null);
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      setLoadingUser(false);
+    }
   };
 
   if (loadingUser) {
@@ -90,7 +128,7 @@ export function Login() {
           <div className="px-2 py-1.5 text-sm font-semibold">Sign in</div>
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            onClick={() => handleOAuthLogin("google")}
+            onClick={() => signInWithGoogle()}
             disabled={loadingUser}
             className="flex items-center gap-2 cursor-pointer"
           >
@@ -102,15 +140,6 @@ export function Login() {
             </svg>
             Continue with Google
           </DropdownMenuItem>
-          {/* Temporarily Removing Github Auth */}
-          {/* <DropdownMenuItem
-            onClick={() => handleOAuthLogin("github")}
-            disabled={isLoading}
-            className="flex items-center gap-2 cursor-pointer"
-          >
-            <Github className="w-4 h-4" />
-            Continue with GitHub
-          </DropdownMenuItem> */}
         </DropdownMenuContent>
       </DropdownMenu>
     );
@@ -121,11 +150,10 @@ export function Login() {
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="icon" className="relative" title={user.name}>
           {user.avatar ? (
-            <img
-              src={user.avatar}
-              alt={user.name}
-              className="h-[1.2rem] w-[1.2rem] rounded-full object-cover"
-            />
+            <Avatar>
+              <AvatarImage src={user.avatar} />
+              <AvatarFallback>CN</AvatarFallback>
+            </Avatar>
           ) : (
             <User className="h-[1.2rem] w-[1.2rem]" />
           )}

@@ -27,7 +27,7 @@ export function ProjectsSection() {
           {projects.map((project, index) => (
             <Card 
               key={index}
-              className="hover:shadow-lg transition-all duration-300 flex flex-col"
+              className="hover:shadow-lg transition-all duration-300 flex fle zx-col"
             >
               <CardHeader>
                 <CardTitle className="text-foreground text-xl">{project.title}</CardTitle>
