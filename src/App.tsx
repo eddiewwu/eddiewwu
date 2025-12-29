@@ -5,9 +5,12 @@ import { Footer } from "@/components/layout/footer";
 import { Home } from "@/pages/Home";
 import Particles from "@/components/Particles";
 import './App.css'
-
+import { CollabEditor } from "./pages/CollabEditor";
+import { useState } from "react";
 
 function App() {
+  const [token, setToken] = useState<string | null>(null);
+
   return (
     // The main container needs to be 'relative' or 'fixed'
     <div className="relative min-h-screen w-full overflow-hidden">
@@ -30,10 +33,12 @@ function App() {
       <div className="relative z-10 flex flex-col min-h-screen">
         <Router>
           <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
-            <Header />
+            <Header onLogin={setToken} />
             <main className="flex-grow">
               <Routes>
                 <Route path="/" element={<Home />} />
+                <Route path="/collaborate" element={<CollabEditor token={token} />} />
+                {/* <Route path="/collaborate" element={<CollabEditor roomId={1} />} /> */}
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </main>

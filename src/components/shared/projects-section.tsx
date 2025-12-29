@@ -6,9 +6,9 @@ const projects = [
   {
     title: "Personal Portfolio Website",
     description: "Wanted to learn more about Bun + Shadcn + Tailwind CSS, so I built my personal portfolio website from scratch using these technologies.",
-    technologies: ["Typescript","React", "Bun", "Shadcn", "Tailwind CSS", "OAuth2.0"],
+    technologies: ["Typescript","React", "Bun", "Vite", "Shadcn", "Tailwind CSS", "OAuth2.0"],
     github: "https://github.com/eddiewwu/eddiewwu",
-    liveDemo: "https://eddiewwu.dev"
+    liveDemo: "https://eddiewwu.vercel.app/"
   }
 ];
 

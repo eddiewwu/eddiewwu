@@ -10,9 +10,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Spinner } from "../ui/spinner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-
-import { auth } from "@/firebaseConfig";
-import { signInWithPopup } from "firebase/auth";
+import { auth, googleProvider } from "@/firebaseConfig";
+import { getAuth, signInWithPopup, signInWithRedirect } from "firebase/auth";
 import { useEffect } from "react";
 import { getRedirectResult, GoogleAuthProvider } from "firebase/auth";
 
@@ -26,69 +25,48 @@ interface UserProfile {
  * Login dropdown component for header
  * Shows user menu when logged in, OAuth options when logged out
  */
-export function Login() {
+export function Login({onLogin}: {onLogin: (token: string | null) => void}) {
   const [user, setUser] = useState(null as UserProfile | null);
   const [loadingUser, setLoadingUser] = useState(false);
 
-  useEffect(() => {const initAuth = async () => {
-      try {
-        // 1. Check if we just returned from a redirect
-        const result = await getRedirectResult(auth);
+  useEffect(() => {
+    setLoadingUser(true);
+    getRedirectResult(getAuth())
+      .then(async (result) => {
         if (result) {
-          const token = await result.user.getIdToken();
+          const userCred = GoogleAuthProvider.credentialFromResult(result);
+          // @ts-expect-error: Firebase result types are tricky
+          const token = await userCred.user.getIdToken();
           document.cookie = `token=${token}; path=/; Secure; SameSite=Strict`;
-          
-          setUser({
-            name: result.user.displayName || "No Name",
-            email: result.user.email || "No Email",
-            avatar: result.user.photoURL || undefined,
-          });
-        } 
-        
-        // 2. Also listen for existing sessions (e.g., on page refresh)
-        // This ensures the 'user' state stays populated if the user is already logged in
-        const { onAuthStateChanged } = await import("firebase/auth");
-        onAuthStateChanged(auth, (firebaseUser) => {
-          if (firebaseUser) {
-            setUser({
-              name: firebaseUser.displayName || "No Name",
-              email: firebaseUser.email || "No Email",
-              avatar: firebaseUser.photoURL || undefined,
-            });
-          } else {
-            setUser(null);
-          }
-          setLoadingUser(false);
-        });
-
-      } catch (error) {
-        console.error("Auth initialization error:", error);
-        setLoadingUser(false);
-      }
-    };
-
-    initAuth();
-  }, []);
+          onLogin(token);
+        } else {
+          console.log("No redirect result, user may not be logged in.");
+        }
+      })
+      .finally(() => setLoadingUser(false));
+  }, [onLogin]);
 
   const signInWithGoogle = async () => {setLoadingUser(true);
     // If you prefer Redirect, uncomment this and remove Popup logic:
-    // await signInWithRedirect(auth, googleProvider);
+    signInWithRedirect(auth, googleProvider);
 
-    try {
-      const userCred = await signInWithPopup(auth, new GoogleAuthProvider());
-      const token = await userCred.user.getIdToken();
-      document.cookie = `token=${token}; path=/; Secure; SameSite=Strict`;
+    // Popup sign-in flow
+    // try {
+    //   const userCred = await signInWithPopup(auth, new GoogleAuthProvider());
+    //   const token = await userCred.user.getIdToken();
+    //   document.cookie = `token=${token}; path=/; Secure; SameSite=Strict`;
+    //   onLogin(token);
       
-      setUser({
-        name: userCred.user.displayName || "No Name",
-        email: userCred.user.email || "No Email",
-        avatar: userCred.user.photoURL || undefined,
-      });
-    } catch (error) {
-      console.error("Popup sign-in error:", error);
-    } finally {
-      setLoadingUser(false);
-    }
+    //   setUser({
+    //     name: userCred.user.displayName || "No Name",
+    //     email: userCred.user.email || "No Email",
+    //     avatar: userCred.user.photoURL || undefined,
+    //   });
+    // } catch (error) {
+    //   console.error("Popup sign-in error:", error);
+    // } finally {
+    //   setLoadingUser(false);
+    // }
   };
 
   const handleLogout = async () => {
