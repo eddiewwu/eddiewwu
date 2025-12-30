@@ -11,9 +11,8 @@ import {
 import { Spinner } from "../ui/spinner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { auth, googleProvider } from "@/firebaseConfig";
-import { getAuth, signInWithPopup, signInWithRedirect } from "firebase/auth";
+import { signInWithPopup } from "firebase/auth";
 import { useEffect } from "react";
-import { getRedirectResult, GoogleAuthProvider } from "firebase/auth";
 
 interface UserProfile {
   name: string;
@@ -31,42 +30,49 @@ export function Login({onLogin}: {onLogin: (token: string | null) => void}) {
 
   useEffect(() => {
     setLoadingUser(true);
-    getRedirectResult(getAuth())
-      .then(async (result) => {
-        if (result) {
-          const userCred = GoogleAuthProvider.credentialFromResult(result);
-          // @ts-expect-error: Firebase result types are tricky
-          const token = await userCred.user.getIdToken();
-          document.cookie = `token=${token}; path=/; Secure; SameSite=Strict`;
-          onLogin(token);
-        } else {
-          console.log("No redirect result, user may not be logged in.");
-        }
-      })
-      .finally(() => setLoadingUser(false));
-  }, [onLogin]);
 
-  const signInWithGoogle = async () => {setLoadingUser(true);
+    auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        const token = await user.getIdToken();
+        document.cookie = `token=${token}; path=/; Secure; SameSite=Strict`;
+        onLogin(token);
+        setUser({
+          name: user.displayName || "No Name",
+          email: user.email || "No Email",
+          avatar: user.photoURL || undefined,
+        });
+      } else {
+        setUser(null);
+      }
+      setLoadingUser(false);
+    });
+
+}, [onLogin]);
+
+  const signInWithGoogle = async () => {
+    setLoadingUser(true);
     // If you prefer Redirect, uncomment this and remove Popup logic:
-    signInWithRedirect(auth, googleProvider);
+    // await setPersistence(auth, browserLocalPersistence);
+    // await signInWithRedirect(auth, googleProvider);
+    // signInWithRedirect(auth, googleProvider);
 
     // Popup sign-in flow
-    // try {
-    //   const userCred = await signInWithPopup(auth, new GoogleAuthProvider());
-    //   const token = await userCred.user.getIdToken();
-    //   document.cookie = `token=${token}; path=/; Secure; SameSite=Strict`;
-    //   onLogin(token);
+    try {
+      const userCred = await signInWithPopup(auth, googleProvider);
+      const token = await userCred.user.getIdToken();
+      document.cookie = `token=${token}; path=/; Secure; SameSite=Strict`;
+      onLogin(token);
       
-    //   setUser({
-    //     name: userCred.user.displayName || "No Name",
-    //     email: userCred.user.email || "No Email",
-    //     avatar: userCred.user.photoURL || undefined,
-    //   });
-    // } catch (error) {
-    //   console.error("Popup sign-in error:", error);
-    // } finally {
-    //   setLoadingUser(false);
-    // }
+      setUser({
+        name: userCred.user.displayName || "No Name",
+        email: userCred.user.email || "No Email",
+        avatar: userCred.user.photoURL || undefined,
+      });
+    } catch (error) {
+      console.log('Error with Login - ', error)
+    } finally {
+      setLoadingUser(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -87,7 +93,14 @@ export function Login({onLogin}: {onLogin: (token: string | null) => void}) {
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Spinner />
+          <Button
+            variant="outline"
+            size="icon"
+            disabled
+            className="pointer-events-none"
+          >
+            <Spinner />
+          </Button>
         </DropdownMenuTrigger>
       </DropdownMenu>
     )
