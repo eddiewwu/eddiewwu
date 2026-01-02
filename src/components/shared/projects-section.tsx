@@ -4,6 +4,13 @@ import { Github, ExternalLink, Folder } from "lucide-react";
 
 const projects = [
   {
+    title: "Coming soon!",
+    description: "I think this next project is lowkey kinda interesting so...",
+    technologies: ["Typescript","React", "Websockets", "Tailwind CSS", "Yjs", "CRDT", "Express", "Node JS"],
+    github: "https://github.com/eddiewwu/eddiewwu",
+    liveDemo: "https://eddiewwu.vercel.app/"
+  },
+  {
     title: "Personal Portfolio Website",
     description: "Wanted to learn more about Bun + Shadcn + Tailwind CSS, so I built my personal portfolio website from scratch using these technologies.",
     technologies: ["Typescript","React", "Bun", "Vite", "Shadcn", "Tailwind CSS", "OAuth2.0"],

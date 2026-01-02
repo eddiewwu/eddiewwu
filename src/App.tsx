@@ -7,8 +7,11 @@ import Particles from "@/components/Particles";
 import './App.css'
 import { CollabEditor } from "./pages/CollabEditor";
 import { useState } from "react";
+import type { UserProfile } from "@/types/auth";
+import { AuthProvider } from "@/context/useAuthContext";
 
 function App() {
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [token, setToken] = useState<string | null>(null);
 
   return (
@@ -31,20 +34,22 @@ function App() {
 
       {/* CONTENT LAYER: Everything Else */}
       <div className="relative z-10 flex flex-col min-h-screen">
-        <Router>
-          <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
-            <Header onLogin={setToken} />
-            <main className="flex-grow">
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/collaborate" element={<CollabEditor token={token} />} />
-                {/* <Route path="/collaborate" element={<CollabEditor roomId={1} />} /> */}
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </main>
-            <Footer />
-          </ThemeProvider>
-        </Router>
+        <AuthProvider user={userProfile}>
+          <Router>
+            <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
+              <Header onLogin={setToken} onUserProfile={setUserProfile} UserProfile={userProfile} />
+              <main className="flex-grow">
+                <Routes>
+                  <Route path="/" element={<Home />} />
+                  <Route path="/collaborate" element={<CollabEditor token={token} userProfile={userProfile} />} />
+                  {/* <Route path="/collaborate" element={<CollabEditor roomId={1} />} /> */}
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </main>
+              <Footer />
+            </ThemeProvider>
+          </Router>
+        </AuthProvider>
       </div>
     </div>
   );

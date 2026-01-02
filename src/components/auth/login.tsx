@@ -13,41 +13,46 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { auth, googleProvider } from "@/firebaseConfig";
 import { signInWithPopup } from "firebase/auth";
 import { useEffect } from "react";
+import type { UserProfile } from "@/types/auth";
 
-interface UserProfile {
-  name: string;
-  email: string;
-  avatar?: string;
+interface LoginProps {
+  onLogin: (token: string | null) => void;
+  onUserProfile: (profile: UserProfile | null) => void;
+  UserProfile: (UserProfile | null) 
 }
 
 /**
  * Login dropdown component for header
  * Shows user menu when logged in, OAuth options when logged out
  */
-export function Login({onLogin}: {onLogin: (token: string | null) => void}) {
-  const [user, setUser] = useState(null as UserProfile | null);
+export function Login({onLogin, onUserProfile, UserProfile}: LoginProps) {
   const [loadingUser, setLoadingUser] = useState(false);
 
   useEffect(() => {
     setLoadingUser(true);
 
-    auth.onAuthStateChanged(async (user) => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user) {
         const token = await user.getIdToken();
+        const profile: UserProfile = {
+          name: user.displayName || "Guest",
+          email: user.email || "",
+          avatar: user.photoURL || undefined,
+          // Assign a random color if you want persistent session colors
+          color: '#' + Math.floor(Math.random() * 16777215).toString(16),
+        };
+
         document.cookie = `token=${token}; path=/; Secure; SameSite=Strict`;
         onLogin(token);
-        setUser({
-          name: user.displayName || "No Name",
-          email: user.email || "No Email",
-          avatar: user.photoURL || undefined,
-        });
+        onUserProfile(profile)
       } else {
-        setUser(null);
+        onLogin(null);
+        onUserProfile(null);
       }
       setLoadingUser(false);
     });
-
-}, [onLogin]);
+  return () => unsubscribe(); // Cleanup listener on unmount
+}, [onLogin, onUserProfile]);
 
   const signInWithGoogle = async () => {
     setLoadingUser(true);
@@ -60,14 +65,17 @@ export function Login({onLogin}: {onLogin: (token: string | null) => void}) {
     try {
       const userCred = await signInWithPopup(auth, googleProvider);
       const token = await userCred.user.getIdToken();
+      const profile: UserProfile = {
+        name: userCred.user.displayName || "Guest",
+        email: userCred.user.email || "",
+        avatar: userCred.user.photoURL || undefined,
+        // Assign a random color if you want persistent session colors
+        color: '#' + Math.floor(Math.random() * 16777215).toString(16),
+      };
+
       document.cookie = `token=${token}; path=/; Secure; SameSite=Strict`;
       onLogin(token);
-      
-      setUser({
-        name: userCred.user.displayName || "No Name",
-        email: userCred.user.email || "No Email",
-        avatar: userCred.user.photoURL || undefined,
-      });
+      onUserProfile(profile);
     } catch (error) {
       console.log('Error with Login - ', error)
     } finally {
@@ -79,9 +87,6 @@ export function Login({onLogin}: {onLogin: (token: string | null) => void}) {
     setLoadingUser(true);
     try {
       await auth.signOut(); // Best practice: Sign out of Firebase first
-      // Clear the cookie
-      document.cookie = "token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; max-age=0";
-      setUser(null);
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
@@ -106,7 +111,7 @@ export function Login({onLogin}: {onLogin: (token: string | null) => void}) {
     )
   };
 
-  if (!user) {
+  if (!UserProfile) {
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -139,11 +144,11 @@ export function Login({onLogin}: {onLogin: (token: string | null) => void}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" className="relative" title={user.name}>
-          {user.avatar ? (
+        <Button variant="outline" size="icon" className="relative" title={UserProfile.name}>
+          {UserProfile.avatar ? (
             <Avatar>
-              <AvatarImage src={user.avatar} />
-              <AvatarFallback>{user.name?.charAt(0) || "U"}</AvatarFallback>
+              <AvatarImage src={UserProfile.avatar} />
+              <AvatarFallback>{UserProfile.name?.charAt(0) || "U"}</AvatarFallback>
             </Avatar>
           ) : (
             <User className="h-[1.2rem] w-[1.2rem]" />
@@ -153,8 +158,8 @@ export function Login({onLogin}: {onLogin: (token: string | null) => void}) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <div className="flex flex-col space-y-1 p-2">
-          <p className="text-sm font-semibold leading-none truncate">{user.name}</p>
-          <p className="text-xs leading-none text-muted-foreground truncate">{user.email}</p>
+          <p className="text-sm font-semibold leading-none truncate">{UserProfile.name}</p>
+          <p className="text-xs leading-none text-muted-foreground truncate">{UserProfile.email}</p>
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleLogout} disabled={loadingUser}>

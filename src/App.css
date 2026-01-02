@@ -241,3 +241,34 @@ button:focus-visible {
 .read-the-docs {
 	color: #888;
 }
+
+/* The cursor line */
+.yRemoteSelection {
+	background-color: rgba(250, 100, 0, 0.2);
+}
+
+.yRemoteSelectionHead {
+	position: absolute;
+	border-left: orange solid 2px;
+	border-top: orange solid 2px;
+	border-bottom: orange solid 2px;
+	height: 100%;
+	box-sizing: border-box;
+}
+
+/* The name tag that floats above the cursor */
+.yRemoteSelectionHead::after {
+	position: absolute;
+	content: 'Guest'; /* This pulls from the Awareness state - Suppose to be attr(data-user-name)*/
+	border: 1px solid orange;
+	border-radius: 4px;
+	padding: 0 4px;
+	top: -20px;
+	left: -2px;
+	font-size: 10px;
+	font-family: sans-serif;
+	font-weight: bold;
+	color: white;
+	background-color: orange;
+	white-space: nowrap;
+}
