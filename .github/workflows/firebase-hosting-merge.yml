@@ -3,18 +3,39 @@
 
 name: Deploy to Firebase Hosting on merge
 on:
-  push:
-    branches:
-      - main
+    push:
+        branches:
+            - main
 jobs:
-  build_and_deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: bun run build
-      - uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_PERSONAL_PROJECT_DF9DC }}
-          channelId: live
-          projectId: personal-project-df9dc
+    build_and_deploy:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            # --- ADD THIS STEP ---
+            - name: Setup Bun
+              uses: oven-sh/setup-bun@v1
+              with:
+                  bun-version: latest
+                  cache: true
+            # ---------------------
+
+            - name: Install Dependencies
+              run: bun install
+
+            - name: Create .env file
+              run: echo "${{ secrets.ENV_FILE }}" > .env
+
+            - name: Build
+              run: bun run build
+              env:
+                  VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+                  # ... other env vars
+
+            - name: Deploy to Firebase
+              uses: FirebaseExtended/action-hosting-deploy@v0
+              with:
+                  repoToken: '${{ secrets.GITHUB_TOKEN }}'
+                  firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}'
+                  projectId: your-project-id
+                  channelId: live

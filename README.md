@@ -8,6 +8,11 @@ To run this on your own clone this and do
 2. Add in your env variables
 3. `bun run dev` or `bun start`
 
+To deploy to firebase
+
+1. Make sure you copy your env prod file to secrets in github
+2. Run the CICD Github action
+
 ## Lessons Learned
 
 ### Portfolio Insights
