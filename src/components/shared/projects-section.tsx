@@ -4,11 +4,11 @@ import { Github, ExternalLink, Folder } from "lucide-react";
 
 const projects = [
   {
-    title: "Coming soon!",
-    description: "I think this next project is lowkey kinda interesting so...",
+    title: "Online Collaborative Code Editor",
+    description: "Built a real-time collaborative code editor using Yjs CRDT for conflict-free data synchronization, Monaco Editor for a rich coding experience, and Websockets for low-latency communication, and OAuth 2.0 for secure user authentication.",
     technologies: ["Typescript","React", "Websockets", "Tailwind CSS", "Yjs", "CRDT", "Express", "Node JS"],
     github: "https://github.com/eddiewwu/eddiewwu",
-    liveDemo: "https://eddiewwu.vercel.app/"
+    liveDemo: "https://eddiewwu.vercel.app/collaborate"
   },
   {
     title: "Personal Portfolio Website",
