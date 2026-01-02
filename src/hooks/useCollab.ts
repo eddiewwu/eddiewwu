@@ -17,7 +17,7 @@ export const useCollab = (token: string | null, userProfile: UserProfile | null,
         // 2. Connect to the WebSocket Provider
         // Yjs handles the "Room" logic automatically via the second argument
         const provider = new WebsocketProvider(
-            `ws://${import.meta.env.VITE_COLLAB_SERVER_URL}?token=${encodeURIComponent(token!)}&roomId=${activeRoomId}`,
+            `wss://${import.meta.env.VITE_COLLAB_SERVER_URL}?token=${encodeURIComponent(token!)}&roomId=${activeRoomId}`,
             activeRoomId,
             ydoc
         );
