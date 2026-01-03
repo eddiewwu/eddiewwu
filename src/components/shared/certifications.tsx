@@ -15,7 +15,7 @@ const certifications = [
   {
     title: "AWS Certified Solutions Architect – Associate",
     issuer: "Amazon Web Services",
-    date: "Aug 2024",
+    date: "Sept 2024",
     description: "Validation of technical expertise in developing and maintaining applications on AWS.",
     tags: ["AWS", "Solutions Architect"],
     link: "https://cp.certmetrics.com/amazon/en/public/verify/credential/0d950334eca3480786a8f5c40f3b1df7",
