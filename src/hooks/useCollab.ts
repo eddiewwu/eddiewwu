@@ -21,6 +21,60 @@ export const useCollab = (token: string | null, userProfile: UserProfile | null,
             activeRoomId,
             ydoc
         );
+
+        // 2. Dynamic CSS Injection for Remote Cursors
+        provider.awareness.on('change', () => {
+            const states = provider.awareness.getStates();
+            const localId = provider.awareness.clientID;
+
+            // Update the "Who's Online" list for the UI
+            const onlineUsers = Array.from(states.entries())
+                .map(([id, state]) => ({
+                    clientId: id,
+                    ...state.user
+                }))
+                .filter(u => u.name);
+            setUsers(onlineUsers);
+
+            // Inject CSS for remote cursors
+            let styleElement = document.getElementById('yjs-cursor-styles');
+            if (!styleElement) {
+                styleElement = document.createElement('style');
+                styleElement.id = 'yjs-cursor-styles';
+                document.head.appendChild(styleElement);
+            }
+
+            let css = '';
+            states.forEach((state, clientId) => {
+                if (clientId === localId || !state.user) return;
+
+                const { color, name } = state.user;
+                css += `
+                    .yRemoteSelection-${clientId} { background-color: ${color}33; }
+                    .yRemoteSelectionHead-${clientId} { 
+                        border-left: ${color} solid 2px;
+                        border-top: ${color} solid 2px;
+                        border-bottom: ${color} solid 2px;
+                    }
+                    .yRemoteSelectionHead-${clientId}::after {
+                        content: "${name}";
+                        background-color: ${color};
+                        position: absolute;
+                        top: -18px;
+                        left: -2px;
+                        font-size: 10px;
+                        padding: 0 4px;
+                        color: white;
+                        white-space: nowrap;
+                        border-radius: 2px;
+                        font-weight: bold;
+                    }
+                `;
+            });
+            styleElement.innerHTML = css;
+        });
+
+
         providerRef.current = provider;
 
         // 3. Define the Shared Text Type
@@ -35,6 +89,7 @@ export const useCollab = (token: string | null, userProfile: UserProfile | null,
             provider.awareness
         );
 
+        console.log("UserProfile:", userProfile);
         // 5. Setup Awareness (Cursors and Usernames)
         provider.awareness.setLocalStateField('user', {
             name: userProfile.name,
