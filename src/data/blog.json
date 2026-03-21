@@ -1,0 +1,11 @@
+[
+  {
+    "id": 1,
+    "title": "Welcome to My Blog",
+    "date": "2026-03-21",
+    "thumbnail": null,
+    "featuredImage": null,
+    "content": "Hello! This is my blog and my first post, I guess I'll jot down some ideas & thoughts down here. Check out this [cool project](https://github.com) for more!",
+    "images": []
+  }
+]

@@ -13,6 +13,23 @@ To deploy to firebase
 1. Make sure you copy your env prod file to secrets in github
 2. Run the CICD Github action
 
+## Tech Stack
+
+- **React** - UI library
+- **TypeScript** - Type safety
+- **Vite** - Build tool
+- **Tailwind CSS** - Styling
+- **Bun** - Package manager
+- **Shadcn/UI** - UI component library
+- **Lucide React** - Icons
+- **Firebase** - Authentication
+- **EmailJS** - Contact form
+- **Yjs** - Real-time collaboration (CRDT)
+- **Monaco Editor** - Code editor
+- **Quill** - Rich text editor
+- **GSAP** - Animations
+- **Three.js** - 3D graphics
+
 ## Lessons Learned
 
 ### Portfolio Insights

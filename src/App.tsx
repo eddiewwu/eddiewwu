@@ -3,6 +3,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { Home } from "@/pages/Home";
+import { Blog } from "@/pages/Blog";
 import Particles from "@/components/Particles";
 import './App.css'
 import { CollabEditor } from "./pages/CollabEditor";
@@ -41,6 +42,7 @@ function App() {
               <main className="flex-grow">
                 <Routes>
                   <Route path="/" element={<Home />} />
+                  <Route path="/blog" element={<Blog />} />
                   <Route path="/collaborate" element={<CollabEditor token={token} userProfile={userProfile} />} />
                   {/* <Route path="/collaborate" element={<CollabEditor roomId={1} />} /> */}
                   <Route path="*" element={<Navigate to="/" replace />} />

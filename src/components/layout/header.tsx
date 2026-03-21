@@ -1,7 +1,7 @@
 import { ModeToggle } from "@/components/shared/mode-toggle";
 import { Login } from "@/components/auth/login";
 import type { UserProfile } from "@/types/auth";
-import { House, Code2 } from "lucide-react";
+import { House, Code2, FileText } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils"; // Shadcn utility for merging classes
 
@@ -28,7 +28,7 @@ export function Header({ onLogin, onUserProfile, UserProfile }: HeaderProps) {
             <House className="h-6 w-6 text-primary" />
               Home
             </a>
-            <a href="/collaborate"
+<a href="/collaborate"
               className={cn(
                 buttonVariants({ variant: "ghost", size: "sm" }),
                 "rounded-full px-4"
@@ -36,6 +36,15 @@ export function Header({ onLogin, onUserProfile, UserProfile }: HeaderProps) {
             >
             <Code2 className="h-6 w-6 text-primary" />
               Collaborate
+            </a>
+            <a href="/blog"
+              className={cn(
+                buttonVariants({ variant: "ghost", size: "sm" }),
+                "rounded-full px-4"
+              )}
+            >
+            <FileText className="h-6 w-6 text-primary" />
+              Blog
             </a>
           </nav>
         </div>
