@@ -33,8 +33,8 @@ async function apiFetch(path: string, options: RequestInit = {}) {
 }
 
 export const api = {
-  login: (idToken: string, accessCode: string) =>
-    apiFetch('/api/auth/login', { method: 'POST', body: JSON.stringify({ idToken, accessCode }) }),
+  login: (idToken: string) =>
+    apiFetch('/api/auth/login', { method: 'POST', body: JSON.stringify({ idToken }) }),
   wsTicket: () =>
     apiFetch('/api/auth/ws-ticket', { method: 'POST' }),
 };

@@ -27,14 +27,14 @@ export const CollabEditor = () => {
         </h1>
     );
 
-    // GUARD 1: Auth check — requires site JWT (Firebase + access code)
+    // GUARD 1: Auth check — requires site JWT (Google sign-in)
     if (!siteJwt) {
         return (
             <div className="p-10">
                 {Header}
                 <div className="flex justify-center">
                     <Card className="w-full max-w-[380px] p-6 shadow-lg">
-                        <CardTitle>Please sign in and enter the access code to continue.</CardTitle>
+                        <CardTitle>Please sign in with Google to continue.</CardTitle>
                     </Card>
                 </div>
             </div>
