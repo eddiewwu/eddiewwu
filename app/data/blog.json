@@ -1,6 +1,7 @@
 [
   {
     "id": 1,
+    "slug": "welcome-to-my-blog",
     "title": "Welcome to My Blog",
     "date": "2026-03-21",
     "thumbnail": null,
