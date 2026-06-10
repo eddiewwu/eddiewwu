@@ -6,5 +6,5 @@ export default {
   ssr: false,
   appDirectory: "app",
   presets: [vercelPreset()],
-  prerender: ["/", "/blog", ...blogPosts.map((p) => `/blog/${p.slug}`)],
+  prerender: ["/", "/blog", "/sitemap.xml", ...blogPosts.map((p) => `/blog/${p.slug}`)],
 } satisfies Config;

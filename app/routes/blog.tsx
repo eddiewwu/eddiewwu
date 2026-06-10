@@ -1,12 +1,14 @@
 import { Link } from "react-router";
 import type { Route } from "./+types/blog";
 import { getPosts, excerpt, formatDate, readingTime } from "@/lib/blog";
+import { pageMeta } from "@/lib/seo";
 
 export function meta(_: Route.MetaArgs) {
-  return [
-    { title: "Blog | Ed's Portfolio" },
-    { name: "description", content: "Writing on software engineering by Ed Wu." },
-  ];
+  return pageMeta({
+    title: "Blog | Ed's Portfolio",
+    description: "Writing on software engineering by Ed Wu.",
+    path: "/blog",
+  });
 }
 
 export default function BlogIndex() {

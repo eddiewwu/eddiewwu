@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /collaborate
+
+Sitemap: https://eddiewwu.vercel.app/sitemap.xml

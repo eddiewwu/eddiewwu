@@ -2,6 +2,7 @@ import { Link, data } from "react-router";
 import type { Route } from "./+types/blog-post";
 import { getPost, formatDate, readingTime, excerpt } from "@/lib/blog";
 import { Markdown } from "@/components/shared/markdown";
+import { pageMeta, SITE_URL } from "@/lib/seo";
 
 // Runs at build time only (prerendered, ssr:false).
 export function loader({ params }: Route.LoaderArgs) {
@@ -14,12 +15,23 @@ export function meta({ data: loaderData }: Route.MetaArgs) {
   if (!loaderData) return [{ title: "Post not found | Ed's Portfolio" }];
   const { post } = loaderData;
   return [
-    { title: `${post.title} | Ed's Portfolio` },
-    { name: "description", content: excerpt(post.content) },
-    { property: "og:type", content: "article" },
-    { property: "og:title", content: post.title },
-    { property: "og:description", content: excerpt(post.content) },
+    ...pageMeta({
+      title: `${post.title} | Ed's Portfolio`,
+      description: excerpt(post.content),
+      path: `/blog/${post.slug}`,
+      ogType: "article",
+    }),
     { property: "article:published_time", content: post.date },
+    {
+      "script:ld+json": {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        headline: post.title,
+        datePublished: post.date,
+        url: `${SITE_URL}/blog/${post.slug}`,
+        author: { "@type": "Person", name: "Ed Wu", url: SITE_URL },
+      },
+    },
   ];
 }
 
