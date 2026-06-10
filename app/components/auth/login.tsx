@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { User, LogOut, LogIn, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -127,7 +128,9 @@ export function Login() {
   }
 
   // ── Access code modal overlay ─────────────────────────────────────────────
-  const accessCodeModal = pendingFirebaseToken ? (
+  // Portaled to <body>: the sticky header's backdrop-filter would otherwise
+  // become the containing block for this fixed overlay and clip it.
+  const accessCodeModal = pendingFirebaseToken ? createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <div className="bg-background border border-border rounded-2xl p-6 w-full max-w-sm shadow-2xl mx-4">
         <div className="flex items-center gap-2 mb-4">
@@ -164,7 +167,8 @@ export function Login() {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   ) : null;
 
   // ── Loading ───────────────────────────────────────────────────────────────
