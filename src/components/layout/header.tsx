@@ -1,50 +1,48 @@
 import { ModeToggle } from "@/components/shared/mode-toggle";
 import { Login } from "@/components/auth/login";
 import type { UserProfile } from "@/types/auth";
-import { House, Code2, FileText } from "lucide-react";
+import { House, Code2, FileText, Plane } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils"; // Shadcn utility for merging classes
+import { cn } from "@/lib/utils";
 
 interface HeaderProps {
   onLogin: (token: string | null) => void;
   onUserProfile: (profile: UserProfile | null) => void;
   UserProfile: UserProfile | null;
+  onSiteJwt: (jwt: string | null) => void;
 }
 
-export function Header({ onLogin, onUserProfile, UserProfile }: HeaderProps) {
+export function Header({ onLogin, onUserProfile, UserProfile, onSiteJwt }: HeaderProps) {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="max-w-6xl mx-auto px-4 flex h-16 items-center">
-        
+
         {/* LEFT SIDE: Navigation */}
         <div className="flex flex-1 items-center justify-start gap-6">
           <nav className="flex items-center space-x-1">
             <a href="/"
-              className={cn(
-                buttonVariants({ variant: "ghost", size: "sm" }),
-                "rounded-full px-4"
-              )}
+              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "rounded-full px-4")}
             >
-            <House className="h-6 w-6 text-primary" />
+              <House className="h-6 w-6 text-primary" />
               Home
             </a>
-<a href="/collaborate"
-              className={cn(
-                buttonVariants({ variant: "ghost", size: "sm" }),
-                "rounded-full px-4"
-              )}
+            <a href="/collaborate"
+              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "rounded-full px-4")}
             >
-            <Code2 className="h-6 w-6 text-primary" />
+              <Code2 className="h-6 w-6 text-primary" />
               Collaborate
             </a>
             <a href="/blog"
-              className={cn(
-                buttonVariants({ variant: "ghost", size: "sm" }),
-                "rounded-full px-4"
-              )}
+              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "rounded-full px-4")}
             >
-            <FileText className="h-6 w-6 text-primary" />
+              <FileText className="h-6 w-6 text-primary" />
               Blog
+            </a>
+            <a href="/trek"
+              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "rounded-full px-4")}
+            >
+              <Plane className="h-6 w-6 text-primary" />
+              Trek
             </a>
           </nav>
         </div>
@@ -52,10 +50,11 @@ export function Header({ onLogin, onUserProfile, UserProfile }: HeaderProps) {
         {/* RIGHT SIDE: Controls */}
         <div className="flex items-center justify-end gap-2">
           <ModeToggle />
-          <Login 
-            onLogin={onLogin} 
-            onUserProfile={onUserProfile} 
-            UserProfile={UserProfile} 
+          <Login
+            onLogin={onLogin}
+            onUserProfile={onUserProfile}
+            UserProfile={UserProfile}
+            onSiteJwt={onSiteJwt}
           />
         </div>
       </div>

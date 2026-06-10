@@ -7,6 +7,7 @@ import { Blog } from "@/pages/Blog";
 import Particles from "@/components/Particles";
 import './App.css'
 import { CollabEditor } from "./pages/CollabEditor";
+import { TrekPage } from "./pages/Trek";
 import { useState } from "react";
 import type { UserProfile } from "@/types/auth";
 import { AuthProvider } from "@/context/useAuthContext";
@@ -14,12 +15,21 @@ import { AuthProvider } from "@/context/useAuthContext";
 function App() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [siteJwt, setSiteJwt] = useState<string | null>(
+    () => sessionStorage.getItem('trek_jwt')
+  );
+
+  function handleSiteJwt(jwt: string | null) {
+    setSiteJwt(jwt);
+    if (jwt) {
+      sessionStorage.setItem('trek_jwt', jwt);
+    } else {
+      sessionStorage.removeItem('trek_jwt');
+    }
+  }
 
   return (
-    // The main container needs to be 'relative' or 'fixed'
     <div className="relative min-h-screen w-full overflow-hidden">
-      
-      {/* BACKGROUND LAYER: The Dots */}
       <div className="absolute inset-0 z-0 pointer-events-none">
        <Particles
         particleColors={['#ffffff', '#ffffff']}
@@ -33,18 +43,22 @@ function App() {
       />
       </div>
 
-      {/* CONTENT LAYER: Everything Else */}
       <div className="relative z-10 flex flex-col min-h-screen">
         <AuthProvider user={userProfile}>
           <Router>
             <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
-              <Header onLogin={setToken} onUserProfile={setUserProfile} UserProfile={userProfile} />
+              <Header
+                onLogin={setToken}
+                onUserProfile={setUserProfile}
+                UserProfile={userProfile}
+                onSiteJwt={handleSiteJwt}
+              />
               <main className="flex-grow">
                 <Routes>
                   <Route path="/" element={<Home />} />
                   <Route path="/blog" element={<Blog />} />
-                  <Route path="/collaborate" element={<CollabEditor token={token} userProfile={userProfile} />} />
-                  {/* <Route path="/collaborate" element={<CollabEditor roomId={1} />} /> */}
+                  <Route path="/collaborate" element={<CollabEditor siteJwt={siteJwt} userProfile={userProfile} />} />
+                  <Route path="/trek" element={<TrekPage siteJwt={siteJwt} />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </main>

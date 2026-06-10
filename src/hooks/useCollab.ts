@@ -4,39 +4,56 @@ import { WebsocketProvider } from 'y-websocket';
 import { MonacoBinding } from 'y-monaco';
 import type { UserProfile } from '@/types/auth';
 
-export const useCollab = (token: string | null, userProfile: UserProfile | null, activeRoomId: string | null) => {
-    const [users, setUsers] = useState<any[]>([]);
+const API = import.meta.env.VITE_API_URL as string;
+const WS_URL = import.meta.env.VITE_COLLAB_SERVER_URL as string;
+
+export const useCollab = (siteJwt: string | null, userProfile: UserProfile | null, activeRoomId: string | null) => {
+    const [users, setUsers] = useState<UserProfile[]>([]);
     const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
     const providerRef = useRef<WebsocketProvider | null>(null);
     const bindingRef = useRef<MonacoBinding | null>(null);
 
-    const onEditorMount = (editor: any) => {
-        // 1. Initialize the Yjs Doc (The Shared Mathematical State)
+    const onEditorMount = async (editor: any) => {
+        if (!siteJwt || !activeRoomId) return;
+
+        // 1. Get a single-use WebSocket ticket
+        let ticket: string;
+        try {
+            const res = await fetch(`${API}/api/auth/ws-ticket`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${siteJwt}` },
+            });
+            if (!res.ok) {
+                console.error('Failed to obtain WebSocket ticket:', res.status);
+                return;
+            }
+            const data = await res.json();
+            ticket = data.ticket as string;
+        } catch (err) {
+            console.error('WebSocket ticket fetch error:', err);
+            return;
+        }
+
+        // 2. Initialize the Yjs Doc
         const ydoc = new Y.Doc();
 
-        // 2. Connect to the WebSocket Provider
-        // Yjs handles the "Room" logic automatically via the second argument
+        // 3. Connect via ticket (not raw Firebase token)
         const provider = new WebsocketProvider(
-            `wss://${import.meta.env.VITE_COLLAB_SERVER_URL}?token=${encodeURIComponent(token!)}&roomId=${activeRoomId}`,
+            `${WS_URL}?ticket=${encodeURIComponent(ticket)}&roomId=${activeRoomId}`,
             activeRoomId,
             ydoc
         );
 
-        // 2. Dynamic CSS Injection for Remote Cursors
+        // 4. Inject CSS for remote cursors
         provider.awareness.on('change', () => {
             const states = provider.awareness.getStates();
             const localId = provider.awareness.clientID;
 
-            // Update the "Who's Online" list for the UI
             const onlineUsers = Array.from(states.entries())
-                .map(([id, state]) => ({
-                    clientId: id,
-                    ...state.user
-                }))
-                .filter(u => u.name);
+                .map(([id, state]) => ({ clientId: id, ...state.user }))
+                .filter((u: any) => u.name);
             setUsers(onlineUsers);
 
-            // Inject CSS for remote cursors
             let styleElement = document.getElementById('yjs-cursor-styles');
             if (!styleElement) {
                 styleElement = document.createElement('style');
@@ -47,11 +64,10 @@ export const useCollab = (token: string | null, userProfile: UserProfile | null,
             let css = '';
             states.forEach((state, clientId) => {
                 if (clientId === localId || !state.user) return;
-
                 const { color, name } = state.user;
                 css += `
                     .yRemoteSelection-${clientId} { background-color: ${color}33; }
-                    .yRemoteSelectionHead-${clientId} { 
+                    .yRemoteSelectionHead-${clientId} {
                         border-left: ${color} solid 2px;
                         border-top: ${color} solid 2px;
                         border-bottom: ${color} solid 2px;
@@ -74,14 +90,10 @@ export const useCollab = (token: string | null, userProfile: UserProfile | null,
             styleElement.innerHTML = css;
         });
 
-
         providerRef.current = provider;
 
-        // 3. Define the Shared Text Type
+        // 5. Shared text + Monaco binding
         const ytext = ydoc.getText('monaco');
-
-        // 4. Bind Yjs to the Monaco Editor
-        // This replaces ALL your manual handleCursor and handleUpdate logic!
         bindingRef.current = new MonacoBinding(
             ytext,
             editor.getModel(),
@@ -89,38 +101,36 @@ export const useCollab = (token: string | null, userProfile: UserProfile | null,
             provider.awareness
         );
 
-        console.log("UserProfile:", userProfile);
-        // 5. Setup Awareness (Cursors and Usernames)
-        provider.awareness.setLocalStateField('user', {
-            name: userProfile.name,
-            color: userProfile.color,
-            avatar: userProfile.avatar
-        });
+        // 6. Set local awareness (cursors / user list)
+        if (userProfile) {
+            provider.awareness.setLocalStateField('user', {
+                name: userProfile.name,
+                color: userProfile.color,
+                avatar: userProfile.avatar,
+            });
+        }
 
-        // Listen for user changes to update a "Who's Online" list
+        // 7. Track online users (excluding self)
         provider.awareness.on('change', () => {
             const states = provider.awareness.getStates();
             const localId = provider.awareness.clientID;
-
             const onlineUsers = Array.from(states.entries())
-                .filter(([clientId, _]) => clientId !== localId)
-                .map(([_, state]) => state.user)
-                .filter(user => user !== undefined);
-
+                .filter(([clientId]) => clientId !== localId)
+                .map(([, state]) => state.user)
+                .filter((u): u is UserProfile => !!u?.name);
             setUsers(onlineUsers);
         });
 
-        provider.on('status', (event: any) => {
-            console.log(`Web Socket Connection Status - ${event.status}`); // 'connecting', 'connected', or 'disconnected'
+        provider.on('status', (event: { status: 'connecting' | 'connected' | 'disconnected' }) => {
+            console.log(`WebSocket status: ${event.status}`);
             setStatus(event.status);
         });
 
-        provider.on('connection-error', (error: any) => {
-            console.error("WebSocket failed to connect:", error);
+        provider.on('connection-error', (error: unknown) => {
+            console.error('WebSocket connection error:', error);
         });
     };
 
-    // IMPORTANT: Clean up when the component unmounts
     useEffect(() => {
         return () => {
             bindingRef.current?.destroy();
@@ -128,5 +138,5 @@ export const useCollab = (token: string | null, userProfile: UserProfile | null,
         };
     }, []);
 
-    return { onEditorMount, users };
+    return { onEditorMount, users, status };
 };
