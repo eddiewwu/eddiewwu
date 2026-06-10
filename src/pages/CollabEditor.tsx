@@ -2,13 +2,14 @@ import { useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCollab } from '@/hooks/useCollab';
-import type { UserProfile } from '@/types/auth';
 import { Avatar, AvatarImage, AvatarFallback } from '@radix-ui/react-avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Hash } from 'lucide-react';
+import { useAuth } from '@/context/useAuthContext';
 
-export const CollabEditor = ({ siteJwt, userProfile }: { siteJwt: string | null, userProfile: UserProfile | null }) => {
+export const CollabEditor = () => {
+    const { siteJwt, userProfile } = useAuth();
     const [roomInput, setRoomInput] = useState("");
     const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
     const { onEditorMount, users } = useCollab(siteJwt, userProfile, activeRoomId);

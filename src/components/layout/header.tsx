@@ -1,18 +1,10 @@
 import { ModeToggle } from "@/components/shared/mode-toggle";
 import { Login } from "@/components/auth/login";
-import type { UserProfile } from "@/types/auth";
-import { House, Code2, FileText, Plane } from "lucide-react";
+import { House, Code2, FileText } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-interface HeaderProps {
-  onLogin: (token: string | null) => void;
-  onUserProfile: (profile: UserProfile | null) => void;
-  UserProfile: UserProfile | null;
-  onSiteJwt: (jwt: string | null) => void;
-}
-
-export function Header({ onLogin, onUserProfile, UserProfile, onSiteJwt }: HeaderProps) {
+export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="max-w-6xl mx-auto px-4 flex h-16 items-center">
@@ -38,24 +30,13 @@ export function Header({ onLogin, onUserProfile, UserProfile, onSiteJwt }: Heade
               <FileText className="h-6 w-6 text-primary" />
               Blog
             </a>
-            <a href="/trek"
-              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "rounded-full px-4")}
-            >
-              <Plane className="h-6 w-6 text-primary" />
-              Trek
-            </a>
           </nav>
         </div>
 
         {/* RIGHT SIDE: Controls */}
         <div className="flex items-center justify-end gap-2">
           <ModeToggle />
-          <Login
-            onLogin={onLogin}
-            onUserProfile={onUserProfile}
-            UserProfile={UserProfile}
-            onSiteJwt={onSiteJwt}
-          />
+          <Login />
         </div>
       </div>
     </header>

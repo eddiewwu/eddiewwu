@@ -6,10 +6,16 @@ import { Label } from "@/components/ui/label";
 import { useState, useEffect } from "react";
 import emailjs from "@emailjs/browser";
 
-// Initialize EmailJS with your public key
-// Get this from https://dashboard.emailjs.com/admin/account
-emailjs.init(import.meta.env.VITE_EMAIL_JS_PUBLIC_KEY as string);
 const COOLDOWN_DURATION = 60; // 60 seconds
+let emailJsInitialized = false;
+
+function ensureEmailJs() {
+  if (!emailJsInitialized) {
+    // Public key from https://dashboard.emailjs.com/admin/account
+    emailjs.init(import.meta.env.VITE_EMAIL_JS_PUBLIC_KEY as string);
+    emailJsInitialized = true;
+  }
+}
 
 export function ContactForm() {
   const [formData, setFormData] = useState({
@@ -78,6 +84,7 @@ export function ContactForm() {
 
     try {
       // Send email using EmailJS
+      ensureEmailJs();
       const response = await emailjs.send(
         import.meta.env.VITE_EMAIL_JS_SERVICE_ID as string,
         import.meta.env.VITE_EMAIL_JS_TEMPLATE_ID as string,

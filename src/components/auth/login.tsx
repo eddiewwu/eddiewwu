@@ -14,17 +14,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { auth, googleProvider } from "@/firebaseConfig";
 import { signInWithPopup } from "firebase/auth";
 import type { UserProfile } from "@/types/auth";
+import { useAuth } from "@/context/useAuthContext";
+import { SITE_JWT_KEY } from "@/lib/api";
 
 const API = import.meta.env.VITE_API_URL as string;
 
-interface LoginProps {
-  onLogin: (token: string | null) => void;
-  onUserProfile: (profile: UserProfile | null) => void;
-  UserProfile: UserProfile | null;
-  onSiteJwt: (jwt: string | null) => void;
-}
-
-export function Login({ onLogin, onUserProfile, UserProfile, onSiteJwt }: LoginProps) {
+export function Login() {
+  const { userProfile, setUserProfile, setSiteJwt } = useAuth();
   const [loadingUser, setLoadingUser] = useState(false);
 
   // Access code modal state
@@ -49,12 +45,11 @@ export function Login({ onLogin, onUserProfile, UserProfile, onSiteJwt }: LoginP
   }
 
   async function resolveSession(idToken: string, profile: UserProfile) {
-    onLogin(idToken);
-    onUserProfile(profile);
+    setUserProfile(profile);
 
-    const existingJwt = sessionStorage.getItem('trek_jwt');
+    const existingJwt = sessionStorage.getItem(SITE_JWT_KEY);
     if (existingJwt) {
-      onSiteJwt(existingJwt);
+      setSiteJwt(existingJwt);
       return;
     }
     // Need access code
@@ -75,10 +70,8 @@ export function Login({ onLogin, onUserProfile, UserProfile, onSiteJwt }: LoginP
         document.cookie = `token=${idToken}; path=/; Secure; SameSite=Strict`;
         await resolveSession(idToken, profile);
       } else {
-        onLogin(null);
-        onUserProfile(null);
-        onSiteJwt(null);
-        sessionStorage.removeItem('trek_jwt');
+        setUserProfile(null);
+        setSiteJwt(null);
       }
       setLoadingUser(false);
     });
@@ -109,8 +102,7 @@ export function Login({ onLogin, onUserProfile, UserProfile, onSiteJwt }: LoginP
     setLoadingUser(true);
     try {
       await auth.signOut();
-      sessionStorage.removeItem('trek_jwt');
-      onSiteJwt(null);
+      setSiteJwt(null);
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
@@ -129,8 +121,7 @@ export function Login({ onLogin, onUserProfile, UserProfile, onSiteJwt }: LoginP
       setAccessCodeError('Invalid access code. Try again.');
       return;
     }
-    sessionStorage.setItem('trek_jwt', jwt);
-    onSiteJwt(jwt);
+    setSiteJwt(jwt);
     setPendingFirebaseToken(null);
     setAccessCode('');
   }
@@ -193,7 +184,7 @@ export function Login({ onLogin, onUserProfile, UserProfile, onSiteJwt }: LoginP
   }
 
   // ── Logged out ────────────────────────────────────────────────────────────
-  if (!UserProfile) {
+  if (!userProfile) {
     return (
       <>
         {accessCodeModal}
@@ -232,11 +223,11 @@ export function Login({ onLogin, onUserProfile, UserProfile, onSiteJwt }: LoginP
       {accessCodeModal}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="icon" className="relative" title={UserProfile.name}>
-            {UserProfile.avatar ? (
+          <Button variant="outline" size="icon" className="relative" title={userProfile.name}>
+            {userProfile.avatar ? (
               <Avatar>
-                <AvatarImage src={UserProfile.avatar} />
-                <AvatarFallback>{UserProfile.name?.charAt(0) || 'U'}</AvatarFallback>
+                <AvatarImage src={userProfile.avatar} />
+                <AvatarFallback>{userProfile.name?.charAt(0) || 'U'}</AvatarFallback>
               </Avatar>
             ) : (
               <User className="h-[1.2rem] w-[1.2rem]" />
@@ -246,8 +237,8 @@ export function Login({ onLogin, onUserProfile, UserProfile, onSiteJwt }: LoginP
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           <div className="flex flex-col space-y-1 p-2">
-            <p className="text-sm font-semibold leading-none truncate">{UserProfile.name}</p>
-            <p className="text-xs leading-none text-muted-foreground truncate">{UserProfile.email}</p>
+            <p className="text-sm font-semibold leading-none truncate">{userProfile.name}</p>
+            <p className="text-xs leading-none text-muted-foreground truncate">{userProfile.email}</p>
           </div>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleLogout} disabled={loadingUser}>

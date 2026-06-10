@@ -1,15 +1,17 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
+export const SITE_JWT_KEY = 'site_jwt';
+
 function getToken() {
-  return sessionStorage.getItem('trek_jwt');
+  return sessionStorage.getItem(SITE_JWT_KEY);
 }
 
 export function setToken(token: string) {
-  sessionStorage.setItem('trek_jwt', token);
+  sessionStorage.setItem(SITE_JWT_KEY, token);
 }
 
 export function clearToken() {
-  sessionStorage.removeItem('trek_jwt');
+  sessionStorage.removeItem(SITE_JWT_KEY);
 }
 
 export function isAuthenticated() {
@@ -35,12 +37,4 @@ export const api = {
     apiFetch('/api/auth/login', { method: 'POST', body: JSON.stringify({ idToken, accessCode }) }),
   wsTicket: () =>
     apiFetch('/api/auth/ws-ticket', { method: 'POST' }),
-  trips: {
-    list: () => apiFetch('/api/trek/trips'),
-    create: (trip: any) => apiFetch('/api/trek/trips', { method: 'POST', body: JSON.stringify(trip) }),
-    update: (id: string, trip: any) => apiFetch(`/api/trek/trips/${id}`, { method: 'PUT', body: JSON.stringify(trip) }),
-    delete: (id: string) => apiFetch(`/api/trek/trips/${id}`, { method: 'DELETE' }),
-    getState: (id: string) => apiFetch(`/api/trek/trips/${id}/state`),
-    saveState: (id: string, state: any) => apiFetch(`/api/trek/trips/${id}/state`, { method: 'PUT', body: JSON.stringify(state) }),
-  },
 };
