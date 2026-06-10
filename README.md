@@ -17,6 +17,7 @@ To deploy to firebase
 
 - **React** - UI library
 - **TypeScript** - Type safety
+- **React Router v7 (framework mode)** - Routing + build-time prerendering for SEO
 - **Vite** - Build tool
 - **Tailwind CSS** - Styling
 - **Bun** - Package manager
@@ -26,9 +27,12 @@ To deploy to firebase
 - **EmailJS** - Contact form
 - **Yjs** - Real-time collaboration (CRDT)
 - **Monaco Editor** - Code editor
-- **Quill** - Rich text editor
-- **GSAP** - Animations
-- **Three.js** - 3D graphics
+
+## Architecture notes
+
+- Public routes (`/`, `/blog`, `/blog/:slug`) are **prerendered to static HTML at build time** (`react-router.config.ts`, `ssr: false` + `prerender`), so crawlers and social bots see real content. Per-route meta (Open Graph, canonical, JSON-LD) lives in each route module; `sitemap.xml` and `robots.txt` are generated/served from the build.
+- `/collaborate` is auth-gated and client-only: it's served via `__spa-fallback.html` and the Monaco/Yjs code is lazy-loaded after hydration.
+- Build output is `build/client/` (vercel handles this via the React Router preset; firebase.json points its hosting there).
 
 ## Lessons Learned
 
