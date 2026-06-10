@@ -1,0 +1,118 @@
+{
+  "buildManifest": {
+    "routes": {
+      "root": {
+        "id": "root",
+        "file": "root.tsx",
+        "path": ""
+      },
+      "routes/home": {
+        "id": "routes/home",
+        "parentId": "root",
+        "file": "routes/home.tsx",
+        "index": true
+      },
+      "routes/blog": {
+        "id": "routes/blog",
+        "parentId": "root",
+        "file": "routes/blog.tsx",
+        "path": "blog"
+      },
+      "routes/collaborate": {
+        "id": "routes/collaborate",
+        "parentId": "root",
+        "file": "routes/collaborate.tsx",
+        "path": "collaborate"
+      },
+      "routes/not-found": {
+        "id": "routes/not-found",
+        "parentId": "root",
+        "file": "routes/not-found.tsx",
+        "path": "*"
+      }
+    }
+  },
+  "reactRouterConfig": {
+    "appDirectory": "C:/Users/Ed/Documents/GitHub/eddiewwu/app",
+    "basename": "/",
+    "buildDirectory": "C:/Users/Ed/Documents/GitHub/eddiewwu/build",
+    "future": {
+      "unstable_optimizeDeps": false,
+      "v8_passThroughRequests": false,
+      "v8_trailingSlashAwareDataRequests": false,
+      "unstable_previewServerPrerendering": false,
+      "v8_middleware": false,
+      "v8_splitRouteModules": false,
+      "v8_viteEnvironmentApi": false
+    },
+    "routes": {
+      "root": {
+        "id": "root",
+        "file": "root.tsx",
+        "path": ""
+      },
+      "routes/home": {
+        "id": "routes/home",
+        "parentId": "root",
+        "file": "routes/home.tsx",
+        "index": true
+      },
+      "routes/blog": {
+        "id": "routes/blog",
+        "parentId": "root",
+        "file": "routes/blog.tsx",
+        "path": "blog"
+      },
+      "routes/collaborate": {
+        "id": "routes/collaborate",
+        "parentId": "root",
+        "file": "routes/collaborate.tsx",
+        "path": "collaborate"
+      },
+      "routes/not-found": {
+        "id": "routes/not-found",
+        "parentId": "root",
+        "file": "routes/not-found.tsx",
+        "path": "*"
+      }
+    },
+    "routeDiscovery": {
+      "mode": "initial"
+    },
+    "serverBuildFile": "index.js",
+    "serverModuleFormat": "esm",
+    "ssr": false,
+    "subResourceIntegrity": false,
+    "allowedActionOrigins": false,
+    "unstable_routeConfig": [
+      {
+        "id": "root",
+        "path": "",
+        "file": "root.tsx",
+        "children": [
+          {
+            "file": "routes/home.tsx",
+            "index": true
+          },
+          {
+            "file": "routes/blog.tsx",
+            "path": "blog"
+          },
+          {
+            "file": "routes/collaborate.tsx",
+            "path": "collaborate"
+          },
+          {
+            "file": "routes/not-found.tsx",
+            "path": "*"
+          }
+        ]
+      }
+    ]
+  },
+  "viteConfig": {
+    "build": {
+      "assetsDir": "assets"
+    }
+  }
+}

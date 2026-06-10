@@ -16,6 +16,9 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* React Router typegen */
+    "rootDirs": [".", "./.react-router/types"],
+
     /* Linting */
     "strict": false,
     "noUnusedLocals": false,
@@ -29,8 +32,8 @@
     /* Shadcn */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./app/*"]
     }
   },
-  "include": ["src"]
+  "include": ["app", ".react-router/types/**/*"]
 }

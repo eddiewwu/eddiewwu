@@ -1,20 +1,14 @@
 import path from "path"
 import tailwindcss from "@tailwindcss/vite"
-import react from "@vitejs/plugin-react"
+import { reactRouter } from "@react-router/dev/vite"
 import { defineConfig } from "vite"
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [tailwindcss(), reactRouter()],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(__dirname, "./app"),
     },
   },
-  server: {
-    cors: {
-      // the origin you will be accessing via browser
-      origin: 'http://my-backend.example.com',
-    },
-  }
 })
