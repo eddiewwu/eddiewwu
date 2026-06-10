@@ -5,4 +5,5 @@ export default {
   ssr: false,
   appDirectory: "app",
   presets: [vercelPreset()],
+  prerender: ["/", "/blog"],
 } satisfies Config;
