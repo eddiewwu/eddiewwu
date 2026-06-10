@@ -6,21 +6,12 @@ import { CertificationSection } from "@/components/shared/certifications";
 
 export function Home() {
     return (
-        <div className="container mx-auto p-8 text-center relative z-10">
-            {/* Hero Section Component */}
+        <div className="relative z-10">
             <HeroSection />
-
-            {/* Work Section Component */}
             <WorkSection />
-
-            {/* Certifications Section Component */}
             <CertificationSection />
-
-            {/* Projects Section Component */}
             <ProjectsSection />
-
-            {/* Contact Form Component */}
             <ContactForm />
-      </div>
+        </div>
     )
 }

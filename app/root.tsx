@@ -60,7 +60,7 @@ export default function App() {
         <ClientOnly>
           <Particles
             particleColors={["#ffffff", "#ffffff"]}
-            particleCount={200}
+            particleCount={120}
             particleSpread={10}
             speed={0.1}
             particleBaseSize={100}

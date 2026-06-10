@@ -1,8 +1,10 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Section } from "@/components/shared/section";
+import { Github, Linkedin, Mail } from "lucide-react";
 import { useState, useEffect } from "react";
 import emailjs from "@emailjs/browser";
 
@@ -122,13 +124,35 @@ export function ContactForm() {
   const cooldownPercent = ((COOLDOWN_DURATION - cooldownRemaining) / COOLDOWN_DURATION) * 100;
 
   return (
-    <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader className="gap-2">
-        <CardTitle className="text-3xl font-bold">Contact Me</CardTitle>
-        <CardDescription>Send me an email and I'll get back to you soon</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
+    <Section id="contact" eyebrow="Contact" title="Get in touch">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-start">
+        <div className="space-y-6">
+          <p className="text-muted-foreground max-w-md">
+            Have a question, an idea, or just want to say hi? Send me a message
+            and I'll get back to you soon.
+          </p>
+          <a
+            href="mailto:eddiewwu@gmail.com"
+            className="inline-flex items-center gap-2 text-foreground hover:text-primary transition-colors"
+          >
+            <Mail size={18} className="text-primary" />
+            eddiewwu@gmail.com
+          </a>
+          <div className="flex items-center gap-4">
+            <a href="https://github.com/eddiewwu" target="_blank" rel="noopener noreferrer" aria-label="GitHub"
+              className="text-muted-foreground hover:text-foreground transition-colors">
+              <Github size={20} />
+            </a>
+            <a href="https://linkedin.com/in/eddiewwu" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn"
+              className="text-muted-foreground hover:text-foreground transition-colors">
+              <Linkedin size={20} />
+            </a>
+          </div>
+        </div>
+
+        <Card className="w-full">
+          <CardContent className="pt-6">
+            <form onSubmit={handleSubmit} className="space-y-6">
           {submitStatus === 'success' && (
             <div className="p-4 bg-green-100 text-green-700 rounded-md">
               Email sent successfully! 🎉
@@ -199,16 +223,18 @@ export function ContactForm() {
             />
           </div>
 
-          <Button 
-            type="submit" 
-            className="w-full" 
+          <Button
+            type="submit"
+            className="w-full"
             disabled={isSubmitting || isOnCooldown}
           >
             {isSubmitting ? 'Sending...' : isOnCooldown ? `Wait ${cooldownRemaining}s...` : 'Send Email'}
           </Button>
-        </form>
-      </CardContent>
-    </Card>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    </Section>
   );
 }
 
