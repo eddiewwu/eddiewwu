@@ -4,14 +4,14 @@ Welcome to my portfolio! Live at [eddiewwu.vercel.app](https://eddiewwu.vercel.a
 
 ## Pages
 
-- `/` — Portfolio: hero, work experience, certifications, projects, contact form
+- `/` — Portfolio: hero, work experience, certifications, projects, contact
 - `/blog` + `/blog/:slug` — Blog posts (markdown, one route per post)
 - `/collaborate` — Real-time collaborative code editor (Google sign-in required)
 
 ## Running locally
 
 1. `bun install`
-2. Add in your env variables (`.env` — Firebase, EmailJS, API URLs)
+2. Add in your env variables (`.env` — Firebase, API URLs)
 3. `bun run dev`
 
 Other scripts:
@@ -44,7 +44,6 @@ Sign in with Google (Firebase popup) → the backend verifies the Firebase ID to
 - **Shadcn/UI** - UI component library
 - **Lucide React** - Icons
 - **Firebase** - Authentication
-- **EmailJS** - Contact form
 - **Yjs** - Real-time collaboration (CRDT)
 - **Monaco Editor** - Code editor
 
