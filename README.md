@@ -30,8 +30,8 @@ Sign in with Google (Firebase popup) → the backend verifies the Firebase ID to
 
 ## Deployment
 
-- **Vercel (primary):** zero-config — the React Router preset handles the prerendered output. Set the `VITE_*` env vars in the Vercel project settings (they're baked in at build time).
-- **Firebase Hosting (fallback):** `firebase.json` serves `build/client/` with `__spa-fallback.html` as the SPA rewrite.
+- **Vercel:** zero-config — the React Router preset deploys the SSR server as a serverless function and `build/client/` as static assets. Set the `VITE_*` env vars in the Vercel project settings (they're baked in at build time).
+- Self-host alternative: `bun run build && bun run start` (`react-router-serve`).
 
 ## Tech Stack
 
@@ -50,10 +50,11 @@ Sign in with Google (Firebase popup) → the backend verifies the Firebase ID to
 
 ## Architecture notes
 
-- Public routes (`/`, `/blog`, `/blog/:slug`) are **prerendered to static HTML at build time** (`react-router.config.ts`, `ssr: false` + `prerender`), so crawlers and social bots see real content. Per-route meta (Open Graph, canonical, JSON-LD) lives in each route module; `sitemap.xml` and `robots.txt` are generated/served from the build.
-- `/collaborate` is auth-gated and client-only: it's served via `__spa-fallback.html` and the Monaco/Yjs code is lazy-loaded after hydration.
+- The app is **server-side rendered** (React Router v7 framework mode, `ssr: true`): every route ships real HTML on first request, so crawlers and social bots see full content. Per-route meta (Open Graph, canonical, JSON-LD) lives in each route module; `sitemap.xml` is a resource route and `robots.txt` is static.
+- `/collaborate` SSRs only a loading shell: the Monaco/Yjs code is browser-only, lazy-loaded behind a hydration gate (`app/components/client-only.tsx`), so SSR and the realtime editor coexist.
+- Unknown routes render the 404 page with a real 404 status (loader in `app/routes/not-found.tsx`).
 - Auth state lives in a single `AuthProvider` context (`app/context/useAuthContext.tsx`) — no prop drilling.
-- Build output is `build/client/` (vercel handles this via the React Router preset; firebase.json points its hosting there).
+- Build output: `build/client/` (assets) + `build/server/` (SSR bundle).
 
 ## Lessons Learned
 

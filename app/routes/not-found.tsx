@@ -1,5 +1,10 @@
-import { Link } from "react-router";
+import { Link, data } from "react-router";
 import type { Route } from "./+types/not-found";
+
+// Render the 404 page with a real 404 status so crawlers don't index it.
+export function loader() {
+  return data(null, { status: 404 });
+}
 
 export function meta(_: Route.MetaArgs) {
   return [
