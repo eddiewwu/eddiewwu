@@ -1,4 +1,8 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+// Fallback covers a missing VITE_API_URL at build time: localhost in dev,
+// the deployed backend in production (never localhost in a prod bundle).
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.PROD ? 'https://eddiewwu-backend.onrender.com' : 'http://localhost:8080');
 
 export const SITE_JWT_KEY = 'site_jwt';
 
