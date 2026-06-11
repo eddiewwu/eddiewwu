@@ -14,43 +14,14 @@ import { auth, googleProvider } from "@/firebaseConfig";
 import { signInWithPopup } from "firebase/auth";
 import type { UserProfile } from "@/types/auth";
 import { useAuth } from "@/context/useAuthContext";
-import { SITE_JWT_KEY } from "@/lib/api";
-
-const API = import.meta.env.VITE_API_URL as string;
 
 export function Login() {
-  const { userProfile, setUserProfile, setSiteJwt } = useAuth();
+  const { userProfile, setUserProfile, setSiteJwt, ensureSiteJwt } = useAuth();
   const [loadingUser, setLoadingUser] = useState(false);
 
-  async function exchangeForSiteJwt(idToken: string): Promise<string | null> {
-    try {
-      const res = await fetch(`${API}/api/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken }),
-      });
-      if (!res.ok) return null;
-      const { token } = await res.json();
-      return token as string;
-    } catch {
-      return null;
-    }
-  }
-
-  async function resolveSession(idToken: string, profile: UserProfile) {
+  async function resolveSession(profile: UserProfile) {
     setUserProfile(profile);
-
-    const existingJwt = sessionStorage.getItem(SITE_JWT_KEY);
-    if (existingJwt) {
-      setSiteJwt(existingJwt);
-      return;
-    }
-    const jwt = await exchangeForSiteJwt(idToken);
-    if (jwt) {
-      setSiteJwt(jwt);
-    } else {
-      console.error('Could not reach the auth API to issue a session token.');
-    }
+    await ensureSiteJwt();
   }
 
   useEffect(() => {
@@ -65,7 +36,7 @@ export function Login() {
           color: '#' + Math.floor(Math.random() * 16777215).toString(16),
         };
         document.cookie = `token=${idToken}; path=/; Secure; SameSite=Strict`;
-        await resolveSession(idToken, profile);
+        await resolveSession(profile);
       } else {
         setUserProfile(null);
         setSiteJwt(null);
@@ -87,7 +58,7 @@ export function Login() {
         color: '#' + Math.floor(Math.random() * 16777215).toString(16),
       };
       document.cookie = `token=${idToken}; path=/; Secure; SameSite=Strict`;
-      await resolveSession(idToken, profile);
+      await resolveSession(profile);
     } catch (error) {
       console.error('Login error:', error);
     } finally {

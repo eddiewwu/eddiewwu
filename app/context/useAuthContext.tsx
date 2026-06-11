@@ -1,13 +1,16 @@
 import type { ReactNode } from "react";
 import { createContext, useContext, useState } from "react";
 import type { UserProfile } from "@/types/auth";
-import { SITE_JWT_KEY } from "@/lib/api";
+import { SITE_JWT_KEY, api } from "@/lib/api";
+import { auth } from "@/firebaseConfig";
 
 interface AuthContextValue {
   userProfile: UserProfile | null;
   setUserProfile: (profile: UserProfile | null) => void;
   siteJwt: string | null;
   setSiteJwt: (jwt: string | null) => void;
+  /** Returns the site JWT, exchanging the Firebase token for one if needed. */
+  ensureSiteJwt: () => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -15,6 +18,7 @@ const AuthContext = createContext<AuthContextValue>({
   setUserProfile: () => {},
   siteJwt: null,
   setSiteJwt: () => {},
+  ensureSiteJwt: async () => null,
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -32,8 +36,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const ensureSiteJwt = async (): Promise<string | null> => {
+    // sessionStorage is the source of truth — avoids stale closure state.
+    const stored = sessionStorage.getItem(SITE_JWT_KEY);
+    if (stored) {
+      setSiteJwtState(stored);
+      return stored;
+    }
+    const user = auth.currentUser;
+    if (!user) return null;
+    try {
+      const idToken = await user.getIdToken();
+      const { token } = await api.login(idToken);
+      setSiteJwt(token);
+      return token as string;
+    } catch (err) {
+      console.error("Site JWT exchange failed:", err);
+      return null;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ userProfile, setUserProfile, siteJwt, setSiteJwt }}>
+    <AuthContext.Provider value={{ userProfile, setUserProfile, siteJwt, setSiteJwt, ensureSiteJwt }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCollab } from '@/hooks/useCollab';
@@ -9,16 +9,35 @@ import { Hash } from 'lucide-react';
 import { useAuth } from '@/context/useAuthContext';
 
 export const CollabEditor = () => {
-    const { siteJwt, userProfile } = useAuth();
+    const { siteJwt, userProfile, ensureSiteJwt } = useAuth();
     const [roomInput, setRoomInput] = useState("");
     const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
+    const [sessionError, setSessionError] = useState(false);
     const { onEditorMount, users } = useCollab(siteJwt, userProfile, activeRoomId);
+
+    // Signed in with Google but no site JWT yet (e.g. the exchange failed at
+    // login time) — retry it here instead of leaving the page stuck.
+    useEffect(() => {
+        if (!siteJwt && userProfile) {
+            setSessionError(false);
+            ensureSiteJwt().then((jwt) => {
+                if (!jwt) setSessionError(true);
+            });
+        }
+    }, [siteJwt, userProfile]);  // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleRoomSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (roomInput.trim()) {
             setActiveRoomId(roomInput.trim());
         }
+    };
+
+    const retrySession = () => {
+        setSessionError(false);
+        ensureSiteJwt().then((jwt) => {
+            if (!jwt) setSessionError(true);
+        });
     };
 
     const Header = (
@@ -33,8 +52,21 @@ export const CollabEditor = () => {
             <div className="p-10">
                 {Header}
                 <div className="flex justify-center">
-                    <Card className="w-full max-w-[380px] p-6 shadow-lg">
-                        <CardTitle>Please sign in with Google to continue.</CardTitle>
+                    <Card className="w-full max-w-[380px] p-6 shadow-lg space-y-3">
+                        {!userProfile ? (
+                            <CardTitle>Please sign in with Google to continue.</CardTitle>
+                        ) : sessionError ? (
+                            <>
+                                <CardTitle>Couldn't reach the auth server.</CardTitle>
+                                <CardDescription>
+                                    You're signed in, but the session token couldn't be issued.
+                                    Check that the backend is running, then retry.
+                                </CardDescription>
+                                <Button size="sm" onClick={retrySession}>Retry</Button>
+                            </>
+                        ) : (
+                            <CardTitle>Setting up your session…</CardTitle>
+                        )}
                     </Card>
                 </div>
             </div>
