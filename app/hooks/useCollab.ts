@@ -3,9 +3,12 @@ import * as Y from 'yjs';
 import { WebsocketProvider } from 'y-websocket';
 import { MonacoBinding } from 'y-monaco';
 import type { UserProfile } from '@/types/auth';
+import { api } from '@/lib/api';
 
-const API = import.meta.env.VITE_API_URL as string;
-const WS_URL = import.meta.env.VITE_COLLAB_SERVER_URL as string;
+// Same missing-env fallback story as lib/api.ts — never undefined in a prod bundle.
+const WS_URL =
+  import.meta.env.VITE_COLLAB_SERVER_URL ||
+  (import.meta.env.PROD ? 'wss://eddiewwu-backend.onrender.com' : 'ws://localhost:8080');
 
 export const useCollab = (siteJwt: string | null, userProfile: UserProfile | null, activeRoomId: string | null) => {
     const [users, setUsers] = useState<UserProfile[]>([]);
@@ -19,15 +22,7 @@ export const useCollab = (siteJwt: string | null, userProfile: UserProfile | nul
         // 1. Get a single-use WebSocket ticket
         let ticket: string;
         try {
-            const res = await fetch(`${API}/api/auth/ws-ticket`, {
-                method: 'POST',
-                headers: { Authorization: `Bearer ${siteJwt}` },
-            });
-            if (!res.ok) {
-                console.error('Failed to obtain WebSocket ticket:', res.status);
-                return;
-            }
-            const data = await res.json();
+            const data = await api.wsTicket();
             ticket = data.ticket as string;
         } catch (err) {
             console.error('WebSocket ticket fetch error:', err);
