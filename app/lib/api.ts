@@ -36,6 +36,12 @@ async function apiFetch(path: string, options: RequestInit = {}) {
   return res.json();
 }
 
+// Render's free tier spins the API down when idle (~1 min cold start).
+// Fire-and-forget ping on page load so it's warming while the visitor browses.
+export function warmUpApi() {
+  fetch(`${API_URL}/status`).catch(() => {});
+}
+
 export const api = {
   login: (idToken: string) =>
     apiFetch('/api/auth/login', { method: 'POST', body: JSON.stringify({ idToken }) }),
