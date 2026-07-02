@@ -32,12 +32,32 @@ export const useCollab = (siteJwt: string | null, userProfile: UserProfile | nul
         // 2. Initialize the Yjs Doc
         const ydoc = new Y.Doc();
 
-        // 3. Connect via ticket (not raw Firebase token)
-        const provider = new WebsocketProvider(
-            `${WS_URL}?ticket=${encodeURIComponent(ticket)}&roomId=${activeRoomId}`,
-            activeRoomId,
-            ydoc
-        );
+        // 3. Connect via ticket (not raw Firebase token). The room id becomes
+        // the URL path (that's what the server keys docs on); the ticket rides
+        // as a query param so it can be swapped out between connection attempts.
+        const provider = new WebsocketProvider(WS_URL, activeRoomId, ydoc, {
+            params: { ticket },
+        });
+        providerRef.current = provider;
+
+        // Tickets are single-use: the one above died the moment the server
+        // accepted it. On any drop, pause auto-reconnect, mint a fresh ticket,
+        // then resume — otherwise the provider retries forever with a dead
+        // ticket and every attempt 401s.
+        const refreshTicketAndReconnect = async () => {
+            if (providerRef.current !== provider) return; // destroyed
+            provider.shouldConnect = false;
+            try {
+                const data = await api.wsTicket();
+                if (providerRef.current !== provider) return;
+                provider.params.ticket = data.ticket as string;
+                provider.connect();
+            } catch (err) {
+                console.error('WebSocket ticket refresh failed, retrying in 3s:', err);
+                setTimeout(refreshTicketAndReconnect, 3000);
+            }
+        };
+        provider.on('connection-close', refreshTicketAndReconnect);
 
         // 4. Inject CSS for remote cursors
         provider.awareness.on('change', () => {
@@ -85,8 +105,6 @@ export const useCollab = (siteJwt: string | null, userProfile: UserProfile | nul
             styleElement.innerHTML = css;
         });
 
-        providerRef.current = provider;
-
         // 5. Shared text + Monaco binding
         const ytext = ydoc.getText('monaco');
         bindingRef.current = new MonacoBinding(
@@ -130,6 +148,9 @@ export const useCollab = (siteJwt: string | null, userProfile: UserProfile | nul
         return () => {
             bindingRef.current?.destroy();
             providerRef.current?.destroy();
+            // Null the ref so the ticket-refresh handler knows to bail.
+            bindingRef.current = null;
+            providerRef.current = null;
         };
     }, []);
 
