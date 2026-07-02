@@ -37,7 +37,7 @@ export const CollabEditor = () => {
         setSessionError(false);
         ensureSiteJwt().then((jwt) => {
             if (!jwt) setSessionError(true);
-        });
+        }); 
     };
 
     const Header = (
