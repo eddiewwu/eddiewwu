@@ -57,7 +57,7 @@ function renderCursorStyles(awareness: Awareness) {
 }
 
 export const useCollab = (
-  enabled: boolean,
+  accessToken: string | null,
   userProfile: UserProfile | null,
   activeRoomId: string | null
 ) => {
@@ -71,23 +71,14 @@ export const useCollab = (
 
   // ── Connection lifecycle, keyed on the room ───────────────────────────────
   useEffect(() => {
-    if (!enabled || !activeRoomId) return;
+    if (!accessToken || !activeRoomId) return;
 
     const doc = new Y.Doc();
     const awareness = new Awareness(doc);
-    const next = new SupabaseRealtimeProvider({
-      supabase,
-      room: activeRoomId,
-      doc,
-      awareness,
-    });
-
-    setProvider(next);
-    setStatus(next.status);
-    setSynced(next.synced);
-
-    const offStatus = next.onStatus(setStatus);
-    const offSynced = next.onSynced(setSynced);
+    let provider: SupabaseRealtimeProvider | null = null;
+    let offStatus: (() => void) | undefined;
+    let offSynced: (() => void) | undefined;
+    let cancelled = false;
 
     // One handler owns both the roster and the cursor styles. The previous
     // version registered two competing listeners that each called setUsers.
@@ -103,18 +94,42 @@ export const useCollab = (
     };
     awareness.on("change", onAwarenessChange);
 
+    // Realtime evaluates RLS against whatever token the socket carries. React
+    // runs child effects before parent ones, so this effect fires before the
+    // AuthProvider has pushed the session token down. Without awaiting it here
+    // the channel joins as `anon` and every policy scoped to `authenticated`
+    // denies it, which surfaces as a permanent "Disconnected".
+    (async () => {
+      await supabase.realtime.setAuth(accessToken);
+      if (cancelled) return;
+
+      const next = new SupabaseRealtimeProvider({
+        supabase,
+        room: activeRoomId,
+        doc,
+        awareness,
+      });
+      provider = next;
+      setProvider(next);
+      setStatus(next.status);
+      setSynced(next.synced);
+      offStatus = next.onStatus(setStatus);
+      offSynced = next.onSynced(setSynced);
+    })();
+
     return () => {
+      cancelled = true;
       awareness.off("change", onAwarenessChange);
-      offStatus();
-      offSynced();
-      next.destroy();
+      offStatus?.();
+      offSynced?.();
+      provider?.destroy();
       awareness.destroy();
       doc.destroy();
       setProvider(null);
       setUsers([]);
       document.getElementById(CURSOR_STYLE_ID)?.remove();
     };
-  }, [enabled, activeRoomId]);
+  }, [accessToken, activeRoomId]);
 
   // ── Local cursor identity ─────────────────────────────────────────────────
   useEffect(() => {

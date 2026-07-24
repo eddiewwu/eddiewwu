@@ -18,6 +18,9 @@ export type ProviderStatus = "connecting" | "connected" | "disconnected";
  * therefore starts from a blank document, which is the intended behaviour for
  * an ephemeral editor but is a real difference from the old Render backend.
  *
+ * Channels are named `collab-<room>` and joined as private, so RLS on
+ * realtime.messages decides who may read and write a room.
+ *
  * Protocol (all payloads base64-encoded, since broadcast carries JSON):
  *   sync        -> { sv }     "I just joined, here is my state vector"
  *   sync-reply  -> { update } the diff the joiner is missing
@@ -50,6 +53,10 @@ export class SupabaseRealtimeProvider {
   private syncTimer: ReturnType<typeof setTimeout> | null = null;
   private awarenessTimer: ReturnType<typeof setInterval> | null = null;
   private destroyed = false;
+  // Broadcasting before the channel joins silently falls back to REST delivery,
+  // which is slower, deprecated, and noisy in the console. Everything outbound
+  // waits for the join and local edits buffer until then.
+  private joined = false;
 
   private _status: ProviderStatus = "connecting";
   private _synced = false;
@@ -62,7 +69,9 @@ export class SupabaseRealtimeProvider {
     this.awareness = awareness ?? new Awareness(doc);
     this.flushInterval = flushInterval;
 
-    this.channel = supabase.channel(`yjs:${room}`, {
+    // No colon in the name: Realtime topics are Phoenix topics, where `:` is
+    // the separator, so an embedded colon risks being parsed as structure.
+    this.channel = supabase.channel(`collab-${room}`, {
       config: {
         // Private channels are authorised by RLS on realtime.messages, so a
         // signed-out client cannot join a room.
@@ -92,15 +101,26 @@ export class SupabaseRealtimeProvider {
       window.addEventListener("beforeunload", this.onUnload);
     }
 
-    this.channel.subscribe((status) => {
+    this.channel.subscribe((status, err) => {
       if (this.destroyed) return;
+      // The error carries the server's reason for refusing the join (an RLS
+      // denial reads as "Unauthorized"). Swallowing it makes a failed channel
+      // indistinguishable from a slow one.
+      if (err) console.error(`Realtime channel ${status}:`, err);
       if (status === "SUBSCRIBED") {
+        this.joined = true;
         this.setStatus("connected");
         this.requestSync();
+        // Edits made while the channel was still joining are buffered rather
+        // than dropped, so peers still receive them.
+        this.flush();
         this.startAwarenessPing();
-      } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
-        this.setStatus("disconnected");
-      } else if (status === "CLOSED") {
+      } else if (
+        status === "CHANNEL_ERROR" ||
+        status === "TIMED_OUT" ||
+        status === "CLOSED"
+      ) {
+        this.joined = false;
         this.setStatus("disconnected");
       }
     });
@@ -141,6 +161,7 @@ export class SupabaseRealtimeProvider {
     this.awareness.off("update", this.onLocalAwareness);
 
     this.announceDeparture();
+    this.joined = false;
     this.channel.unsubscribe();
 
     this.statusListeners.clear();
@@ -151,7 +172,7 @@ export class SupabaseRealtimeProvider {
   // ── Outgoing ──────────────────────────────────────────────────────────────
 
   private send(event: string, payload: Record<string, string>) {
-    if (this.destroyed) return;
+    if (this.destroyed || !this.joined) return;
     this.channel.send({ type: "broadcast", event, payload });
   }
 
@@ -178,7 +199,8 @@ export class SupabaseRealtimeProvider {
   };
 
   private flush() {
-    if (this.pending.length === 0) return;
+    // Keep buffering until the join lands; the SUBSCRIBED handler drains this.
+    if (!this.joined || this.pending.length === 0) return;
     const merged = Y.mergeUpdates(this.pending);
     this.pending = [];
     const update = this.encode(merged, "update");
@@ -194,6 +216,9 @@ export class SupabaseRealtimeProvider {
     origin: unknown
   ) => {
     if (origin === this) return;
+    // Pre-join awareness changes need no buffering: the join handler broadcasts
+    // the current local state wholesale.
+    if (!this.joined) return;
     const changed = added.concat(updated, removed);
     if (changed.length === 0) return;
     const update = this.encode(
@@ -235,6 +260,7 @@ export class SupabaseRealtimeProvider {
   private announceDeparture() {
     const clientId = this.doc.clientID;
     removeAwarenessStates(this.awareness, [clientId], this);
+    if (!this.joined) return;
     const update = this.encode(
       encodeAwarenessUpdate(this.awareness, [clientId]),
       "departure"

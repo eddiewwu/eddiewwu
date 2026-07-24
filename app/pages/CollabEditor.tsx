@@ -25,7 +25,11 @@ export const CollabEditor = () => {
     const { session, userProfile, loading, authError } = useAuth();
     const [roomInput, setRoomInput] = useState("");
     const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
-    const { onEditorMount, users, status } = useCollab(!!session, userProfile, activeRoomId);
+    const { onEditorMount, users, status } = useCollab(
+        session?.access_token ?? null,
+        userProfile,
+        activeRoomId
+    );
 
     const handleRoomSubmit = (e: React.FormEvent) => {
         e.preventDefault();
