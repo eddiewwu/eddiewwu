@@ -11,7 +11,9 @@ Welcome to my portfolio! Live at [eddiewwu.vercel.app](https://eddiewwu.vercel.a
 ## Running locally
 
 1. `bun install`
-2. Add in your env variables (`.env` — Firebase, API URLs)
+2. Add your env variables to `.env`:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
 3. `bun run dev`
 
 Other scripts:
@@ -22,15 +24,41 @@ bun run typecheck  # react-router typegen + tsc
 bun run preview    # serve the production build locally
 ```
 
-The backend ([personal-portfolio-backend](https://github.com/eddiewwu/personal-portfolio-backend)) must be running for sign-in and the collab editor; everything else works without it.
+There is no separate backend service. Supabase provides auth and the realtime
+transport; everything else is static.
 
 ## Auth flow
 
-Sign in with Google (Firebase popup) → the backend verifies the Firebase ID token and returns a site JWT (7-day TTL, kept in sessionStorage). That JWT gates the collab editor and is exchanged for single-use WebSocket tickets. Any Google account can sign in — there is no access code.
+Sign in with Google via Supabase Auth (OAuth redirect, PKCE). Supabase issues the
+session directly, so there is no token-exchange hop and no bespoke site JWT: the
+Supabase access token is what gates the collab editor and authorises Realtime
+channels. Any Google account can sign in, there is no access code.
+
+Sign-in is a full-page redirect rather than the old Firebase popup. The user
+returns to whichever page they started from, and `detectSessionInUrl` strips the
+PKCE code on hydration.
+
+## Realtime collaboration
+
+The editor syncs Yjs documents over Supabase Realtime **broadcast** rather than a
+WebSocket server. `app/lib/yjs-realtime-provider.ts` implements the transport:
+peers exchange state vectors on join, then stream merged incremental updates and
+awareness (cursor) state.
+
+The tradeoff versus the old `y-websocket` server: no server-side peer holds the
+authoritative document, so **joining an empty room starts from a blank
+document**. For an explicitly ephemeral editor that is the intended semantic, but
+it is a behaviour change. Persisting updates to a Postgres table would restore
+the old behaviour if that ever matters.
+
+Rooms use private channels, so joining is gated by RLS on `realtime.messages`
+(see `supabase/migrations/`). Applying that migration is required, since a
+private-channel join is denied by default.
 
 ## Deployment
 
-- **Vercel:** zero-config — the React Router preset deploys the SSR server as a serverless function and `build/client/` as static assets. Set the `VITE_*` env vars in the Vercel project settings (they're baked in at build time).
+- **Vercel:** zero-config. The React Router preset deploys the SSR server as a serverless function and `build/client/` as static assets. Set the `VITE_*` env vars in the Vercel project settings (they're baked in at build time).
+- **Supabase:** enable the Google auth provider, add `https://<project-ref>.supabase.co/auth/v1/callback` to the Google Cloud OAuth client, and allow-list the site + preview URLs under Auth → URL Configuration. Apply `supabase/migrations/` for the Realtime RLS policies.
 - Self-host alternative: `bun run build && bun run start` (`react-router-serve`).
 
 ## Tech Stack
@@ -43,7 +71,7 @@ Sign in with Google (Firebase popup) → the backend verifies the Firebase ID to
 - **Bun** - Package manager
 - **Shadcn/UI** - UI component library
 - **Lucide React** - Icons
-- **Firebase** - Authentication
+- **Supabase** - Authentication (Google OAuth) + Realtime transport
 - **Yjs** - Real-time collaboration (CRDT)
 - **Monaco Editor** - Code editor
 
@@ -51,6 +79,7 @@ Sign in with Google (Firebase popup) → the backend verifies the Firebase ID to
 
 - The app is **server-side rendered** (React Router v7 framework mode, `ssr: true`): every route ships real HTML on first request, so crawlers and social bots see full content. Per-route meta (Open Graph, canonical, JSON-LD) lives in each route module; `sitemap.xml` is a resource route and `robots.txt` is static.
 - `/collaborate` SSRs only a loading shell: the Monaco/Yjs code is browser-only, lazy-loaded behind a hydration gate (`app/components/client-only.tsx`), so SSR and the realtime editor coexist.
+- `app/lib/supabase.ts` throws at import time if the `VITE_SUPABASE_*` vars are missing. That fails the build rather than shipping a bundle that only breaks once a visitor tries to sign in.
 - Unknown routes render the 404 page with a real 404 status (loader in `app/routes/not-found.tsx`).
 - Auth state lives in a single `AuthProvider` context (`app/context/useAuthContext.tsx`) — no prop drilling.
 - Build output: `build/client/` (assets) + `build/server/` (SSR bundle).

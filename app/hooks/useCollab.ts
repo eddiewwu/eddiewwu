@@ -1,158 +1,149 @@
-import { useEffect, useRef, useState } from 'react';
-import * as Y from 'yjs';
-import { WebsocketProvider } from 'y-websocket';
-import { MonacoBinding } from 'y-monaco';
-import type { UserProfile } from '@/types/auth';
-import { api } from '@/lib/api';
+import { useCallback, useEffect, useState } from "react";
+import * as Y from "yjs";
+import { Awareness } from "y-protocols/awareness";
+import { MonacoBinding } from "y-monaco";
+import type { editor } from "monaco-editor";
+import type { UserProfile } from "@/types/auth";
+import { supabase } from "@/lib/supabase";
+import {
+  SupabaseRealtimeProvider,
+  type ProviderStatus,
+} from "@/lib/yjs-realtime-provider";
 
-// Same missing-env fallback story as lib/api.ts — never undefined in a prod bundle.
-const WS_URL =
-  import.meta.env.VITE_COLLAB_SERVER_URL ||
-  (import.meta.env.PROD ? 'wss://eddiewwu-backend.onrender.com' : 'ws://localhost:8080');
+const CURSOR_STYLE_ID = "yjs-cursor-styles";
 
-export const useCollab = (siteJwt: string | null, userProfile: UserProfile | null, activeRoomId: string | null) => {
-    const [users, setUsers] = useState<UserProfile[]>([]);
-    const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
-    const providerRef = useRef<WebsocketProvider | null>(null);
-    const bindingRef = useRef<MonacoBinding | null>(null);
+/** CSS `content` is a string literal: a stray quote or backslash breaks out of it. */
+function cssString(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
 
-    const onEditorMount = async (editor: any) => {
-        if (!siteJwt || !activeRoomId) return;
+function renderCursorStyles(awareness: Awareness) {
+  const localId = awareness.clientID;
+  let element = document.getElementById(CURSOR_STYLE_ID);
+  if (!element) {
+    element = document.createElement("style");
+    element.id = CURSOR_STYLE_ID;
+    document.head.appendChild(element);
+  }
 
-        // 1. Get a single-use WebSocket ticket
-        let ticket: string;
-        try {
-            const data = await api.wsTicket();
-            ticket = data.ticket as string;
-        } catch (err) {
-            console.error('WebSocket ticket fetch error:', err);
-            return;
-        }
+  let css = "";
+  awareness.getStates().forEach((state, clientId) => {
+    if (clientId === localId || !state.user) return;
+    const { color, name } = state.user as UserProfile;
+    if (!color || !name) return;
+    css += `
+      .yRemoteSelection-${clientId} { background-color: ${color}33; }
+      .yRemoteSelectionHead-${clientId} {
+        border-left: ${color} solid 2px;
+        border-top: ${color} solid 2px;
+        border-bottom: ${color} solid 2px;
+      }
+      .yRemoteSelectionHead-${clientId}::after {
+        content: "${cssString(name)}";
+        background-color: ${color};
+        position: absolute;
+        top: -18px;
+        left: -2px;
+        font-size: 10px;
+        padding: 0 4px;
+        color: white;
+        white-space: nowrap;
+        border-radius: 2px;
+        font-weight: bold;
+      }
+    `;
+  });
+  element.textContent = css;
+}
 
-        // 2. Initialize the Yjs Doc
-        const ydoc = new Y.Doc();
+export const useCollab = (
+  enabled: boolean,
+  userProfile: UserProfile | null,
+  activeRoomId: string | null
+) => {
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [status, setStatus] = useState<ProviderStatus>("connecting");
+  const [synced, setSynced] = useState(false);
 
-        // 3. Connect via ticket (not raw Firebase token). The room id becomes
-        // the URL path (that's what the server keys docs on); the ticket rides
-        // as a query param so it can be swapped out between connection attempts.
-        const provider = new WebsocketProvider(WS_URL, activeRoomId, ydoc, {
-            params: { ticket },
-        });
-        providerRef.current = provider;
+  const [editorInstance, setEditorInstance] =
+    useState<editor.IStandaloneCodeEditor | null>(null);
+  const [provider, setProvider] = useState<SupabaseRealtimeProvider | null>(null);
 
-        // Tickets are single-use: the one above died the moment the server
-        // accepted it. On any drop, pause auto-reconnect, mint a fresh ticket,
-        // then resume — otherwise the provider retries forever with a dead
-        // ticket and every attempt 401s.
-        const refreshTicketAndReconnect = async () => {
-            if (providerRef.current !== provider) return; // destroyed
-            provider.shouldConnect = false;
-            try {
-                const data = await api.wsTicket();
-                if (providerRef.current !== provider) return;
-                provider.params.ticket = data.ticket as string;
-                provider.connect();
-            } catch (err) {
-                console.error('WebSocket ticket refresh failed, retrying in 3s:', err);
-                setTimeout(refreshTicketAndReconnect, 3000);
-            }
-        };
-        provider.on('connection-close', refreshTicketAndReconnect);
+  // ── Connection lifecycle, keyed on the room ───────────────────────────────
+  useEffect(() => {
+    if (!enabled || !activeRoomId) return;
 
-        // 4. Inject CSS for remote cursors
-        provider.awareness.on('change', () => {
-            const states = provider.awareness.getStates();
-            const localId = provider.awareness.clientID;
+    const doc = new Y.Doc();
+    const awareness = new Awareness(doc);
+    const next = new SupabaseRealtimeProvider({
+      supabase,
+      room: activeRoomId,
+      doc,
+      awareness,
+    });
 
-            const onlineUsers = Array.from(states.entries())
-                .map(([id, state]) => ({ clientId: id, ...state.user }))
-                .filter((u: any) => u.name);
-            setUsers(onlineUsers);
+    setProvider(next);
+    setStatus(next.status);
+    setSynced(next.synced);
 
-            let styleElement = document.getElementById('yjs-cursor-styles');
-            if (!styleElement) {
-                styleElement = document.createElement('style');
-                styleElement.id = 'yjs-cursor-styles';
-                document.head.appendChild(styleElement);
-            }
+    const offStatus = next.onStatus(setStatus);
+    const offSynced = next.onSynced(setSynced);
 
-            let css = '';
-            states.forEach((state, clientId) => {
-                if (clientId === localId || !state.user) return;
-                const { color, name } = state.user;
-                css += `
-                    .yRemoteSelection-${clientId} { background-color: ${color}33; }
-                    .yRemoteSelectionHead-${clientId} {
-                        border-left: ${color} solid 2px;
-                        border-top: ${color} solid 2px;
-                        border-bottom: ${color} solid 2px;
-                    }
-                    .yRemoteSelectionHead-${clientId}::after {
-                        content: "${name}";
-                        background-color: ${color};
-                        position: absolute;
-                        top: -18px;
-                        left: -2px;
-                        font-size: 10px;
-                        padding: 0 4px;
-                        color: white;
-                        white-space: nowrap;
-                        border-radius: 2px;
-                        font-weight: bold;
-                    }
-                `;
-            });
-            styleElement.innerHTML = css;
-        });
-
-        // 5. Shared text + Monaco binding
-        const ytext = ydoc.getText('monaco');
-        bindingRef.current = new MonacoBinding(
-            ytext,
-            editor.getModel(),
-            new Set([editor]),
-            provider.awareness
-        );
-
-        // 6. Set local awareness (cursors / user list)
-        if (userProfile) {
-            provider.awareness.setLocalStateField('user', {
-                name: userProfile.name,
-                color: userProfile.color,
-                avatar: userProfile.avatar,
-            });
-        }
-
-        // 7. Track online users (excluding self)
-        provider.awareness.on('change', () => {
-            const states = provider.awareness.getStates();
-            const localId = provider.awareness.clientID;
-            const onlineUsers = Array.from(states.entries())
-                .filter(([clientId]) => clientId !== localId)
-                .map(([, state]) => state.user)
-                .filter((u): u is UserProfile => !!u?.name);
-            setUsers(onlineUsers);
-        });
-
-        provider.on('status', (event: { status: 'connecting' | 'connected' | 'disconnected' }) => {
-            console.log(`WebSocket status: ${event.status}`);
-            setStatus(event.status);
-        });
-
-        provider.on('connection-error', (error: unknown) => {
-            console.error('WebSocket connection error:', error);
-        });
+    // One handler owns both the roster and the cursor styles. The previous
+    // version registered two competing listeners that each called setUsers.
+    const onAwarenessChange = () => {
+      const localId = awareness.clientID;
+      setUsers(
+        Array.from(awareness.getStates().entries())
+          .filter(([clientId]) => clientId !== localId)
+          .map(([, state]) => state.user as UserProfile | undefined)
+          .filter((u): u is UserProfile => !!u?.name)
+      );
+      renderCursorStyles(awareness);
     };
+    awareness.on("change", onAwarenessChange);
 
-    useEffect(() => {
-        return () => {
-            bindingRef.current?.destroy();
-            providerRef.current?.destroy();
-            // Null the ref so the ticket-refresh handler knows to bail.
-            bindingRef.current = null;
-            providerRef.current = null;
-        };
-    }, []);
+    return () => {
+      awareness.off("change", onAwarenessChange);
+      offStatus();
+      offSynced();
+      next.destroy();
+      awareness.destroy();
+      doc.destroy();
+      setProvider(null);
+      setUsers([]);
+      document.getElementById(CURSOR_STYLE_ID)?.remove();
+    };
+  }, [enabled, activeRoomId]);
 
-    return { onEditorMount, users, status };
+  // ── Local cursor identity ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!provider || !userProfile) return;
+    provider.awareness.setLocalStateField("user", {
+      name: userProfile.name,
+      color: userProfile.color,
+      avatar: userProfile.avatar,
+    });
+  }, [provider, userProfile]);
+
+  // ── Monaco binding, once both the editor and the provider exist ───────────
+  useEffect(() => {
+    const model = editorInstance?.getModel();
+    if (!provider || !editorInstance || !model) return;
+
+    const binding = new MonacoBinding(
+      provider.doc.getText("monaco"),
+      model,
+      new Set([editorInstance]),
+      provider.awareness
+    );
+    return () => binding.destroy();
+  }, [provider, editorInstance]);
+
+  const onEditorMount = useCallback(
+    (instance: editor.IStandaloneCodeEditor) => setEditorInstance(instance),
+    []
+  );
+
+  return { onEditorMount, users, status, synced };
 };

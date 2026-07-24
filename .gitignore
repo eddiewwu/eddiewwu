@@ -19,6 +19,7 @@ build
 .env.local
 .env.*.local
 .env.production
+client_secret_2*
 
 # Firebase
 .firebase

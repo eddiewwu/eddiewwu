@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCollab } from '@/hooks/useCollab';
@@ -6,25 +6,26 @@ import { Avatar, AvatarImage, AvatarFallback } from '@radix-ui/react-avatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Hash } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/useAuthContext';
 
+const statusLabel = {
+    connecting: 'Connecting',
+    connected: 'Connected',
+    disconnected: 'Disconnected',
+} as const;
+
+const statusDot = {
+    connecting: 'bg-yellow-500',
+    connected: 'bg-green-500',
+    disconnected: 'bg-red-500',
+} as const;
+
 export const CollabEditor = () => {
-    const { siteJwt, userProfile, ensureSiteJwt } = useAuth();
+    const { session, userProfile, loading, authError } = useAuth();
     const [roomInput, setRoomInput] = useState("");
     const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
-    const [sessionError, setSessionError] = useState(false);
-    const { onEditorMount, users } = useCollab(siteJwt, userProfile, activeRoomId);
-
-    // Signed in with Google but no site JWT yet (e.g. the exchange failed at
-    // login time) — retry it here instead of leaving the page stuck.
-    useEffect(() => {
-        if (!siteJwt && userProfile) {
-            setSessionError(false);
-            ensureSiteJwt().then((jwt) => {
-                if (!jwt) setSessionError(true);
-            });
-        }
-    }, [siteJwt, userProfile]);  // eslint-disable-line react-hooks/exhaustive-deps
+    const { onEditorMount, users, status } = useCollab(!!session, userProfile, activeRoomId);
 
     const handleRoomSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -33,39 +34,36 @@ export const CollabEditor = () => {
         }
     };
 
-    const retrySession = () => {
-        setSessionError(false);
-        ensureSiteJwt().then((jwt) => {
-            if (!jwt) setSessionError(true);
-        }); 
-    };
-
     const Header = (
         <h1 className="scroll-m-20 text-center text-4xl font-extrabold tracking-tight text-balance mb-8">
             The Ephemeral Collab Editor
         </h1>
     );
 
-    // GUARD 1: Auth check — requires site JWT (Google sign-in)
-    if (!siteJwt) {
+    // GUARD 1: Auth check. Supabase owns the session, so there is no token
+    // exchange to retry here anymore.
+    if (loading || !session) {
         return (
             <div className="p-10">
                 {Header}
                 <div className="flex justify-center">
                     <Card className="w-full max-w-[380px] p-6 shadow-lg space-y-3">
-                        {!userProfile ? (
-                            <CardTitle>Please sign in with Google to continue.</CardTitle>
-                        ) : sessionError ? (
+                        {loading ? (
+                            <CardTitle>Checking your session…</CardTitle>
+                        ) : authError ? (
                             <>
-                                <CardTitle>Couldn't reach the auth server.</CardTitle>
-                                <CardDescription>
-                                    You're signed in, but the session token couldn't be issued.
-                                    Check that the backend is running, then retry.
+                                <CardTitle>Sign-in failed.</CardTitle>
+                                <CardDescription className="text-destructive">
+                                    {authError}
                                 </CardDescription>
-                                <Button size="sm" onClick={retrySession}>Retry</Button>
                             </>
                         ) : (
-                            <CardTitle>Setting up your session…</CardTitle>
+                            <>
+                                <CardTitle>Please sign in with Google to continue.</CardTitle>
+                                <CardDescription>
+                                    Rooms are private to signed-in users.
+                                </CardDescription>
+                            </>
                         )}
                     </Card>
                 </div>
@@ -117,18 +115,33 @@ export const CollabEditor = () => {
         <div className="flex flex-col h-screen p-4">
             {Header}
 
-            <div className="flex gap-2 mb-4 justify-center">
-                Users Online:
-                {users.map((user, index) => (
-                    <Avatar key={index}
-                        className="w-8 h-8 border-2 border-background rounded-full shadow-sm">
-                        <AvatarImage src={user.avatar} className="rounded-full" />
-                        <AvatarFallback className="rounded-full text-white text-[10px]"
-                            style={{ backgroundColor: user.color }}>
-                            {user.name.charAt(0)}
-                        </AvatarFallback>
-                    </Avatar>
-                ))}
+            <div className="flex items-center gap-4 mb-4 justify-center">
+                <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span className={cn('h-2 w-2 rounded-full', statusDot[status])} />
+                    {statusLabel[status]}
+                </span>
+
+                <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                    Room #{activeRoomId}
+                </span>
+
+                <span className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Users online:</span>
+                    {users.length === 0 ? (
+                        <span className="text-sm text-muted-foreground">just you</span>
+                    ) : (
+                        users.map((user, index) => (
+                            <Avatar key={index}
+                                className="w-8 h-8 border-2 border-background rounded-full shadow-sm">
+                                <AvatarImage src={user.avatar} className="rounded-full" />
+                                <AvatarFallback className="flex h-full w-full items-center justify-center rounded-full text-white text-[10px]"
+                                    style={{ backgroundColor: user.color }}>
+                                    {user.name.charAt(0)}
+                                </AvatarFallback>
+                            </Avatar>
+                        ))
+                    )}
+                </span>
             </div>
 
             <div className="border rounded-xl overflow-hidden shadow-2xl">

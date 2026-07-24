@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { User, LogOut, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,71 +10,29 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Spinner } from "../ui/spinner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { auth, googleProvider } from "@/firebaseConfig";
-import { signInWithPopup } from "firebase/auth";
-import type { UserProfile } from "@/types/auth";
 import { useAuth } from "@/context/useAuthContext";
 
 export function Login() {
-  const { userProfile, setUserProfile, setSiteJwt, ensureSiteJwt } = useAuth();
-  const [loadingUser, setLoadingUser] = useState(false);
+  const { userProfile, loading, authError, signInWithGoogle, signOut } = useAuth();
+  // signInWithGoogle navigates away, so this only covers the redirect gap.
+  const [pending, setPending] = useState(false);
+  const loadingUser = loading || pending;
 
-  async function resolveSession(profile: UserProfile) {
-    setUserProfile(profile);
-    await ensureSiteJwt();
-  }
-
-  useEffect(() => {
-    setLoadingUser(true);
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      if (user) {
-        const idToken = await user.getIdToken();
-        const profile: UserProfile = {
-          name: user.displayName || 'Guest',
-          email: user.email || '',
-          avatar: user.photoURL || undefined,
-          color: '#' + Math.floor(Math.random() * 16777215).toString(16),
-        };
-        document.cookie = `token=${idToken}; path=/; Secure; SameSite=Strict`;
-        await resolveSession(profile);
-      } else {
-        setUserProfile(null);
-        setSiteJwt(null);
-      }
-      setLoadingUser(false);
-    });
-    return () => unsubscribe();
-  }, []);  // eslint-disable-line react-hooks/exhaustive-deps
-
-  const signInWithGoogle = async () => {
-    setLoadingUser(true);
+  const handleSignIn = async () => {
+    setPending(true);
     try {
-      const userCred = await signInWithPopup(auth, googleProvider);
-      const idToken = await userCred.user.getIdToken();
-      const profile: UserProfile = {
-        name: userCred.user.displayName || 'Guest',
-        email: userCred.user.email || '',
-        avatar: userCred.user.photoURL || undefined,
-        color: '#' + Math.floor(Math.random() * 16777215).toString(16),
-      };
-      document.cookie = `token=${idToken}; path=/; Secure; SameSite=Strict`;
-      await resolveSession(profile);
-    } catch (error) {
-      console.error('Login error:', error);
+      await signInWithGoogle();
     } finally {
-      setLoadingUser(false);
+      setPending(false);
     }
   };
 
   const handleLogout = async () => {
-    setLoadingUser(true);
+    setPending(true);
     try {
-      await auth.signOut();
-      setSiteJwt(null);
-    } catch (error) {
-      console.error('Logout error:', error);
+      await signOut();
     } finally {
-      setLoadingUser(false);
+      setPending(false);
     }
   };
 
@@ -96,16 +54,27 @@ export function Login() {
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="icon" title="Login">
+          <Button
+            variant="outline"
+            size="icon"
+            title={authError ? "Sign-in failed" : "Login"}
+            className="relative"
+          >
             <LogIn className="h-[1.2rem] w-[1.2rem]" />
+            {authError && (
+              <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-destructive" />
+            )}
             <span className="sr-only">Login menu</span>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuContent align="end" className="w-64">
           <div className="px-2 py-1.5 text-sm font-semibold">Sign in</div>
+          {authError && (
+            <p className="px-2 pb-1.5 text-xs text-destructive">{authError}</p>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
-            onClick={signInWithGoogle}
+            onClick={handleSignIn}
             disabled={loadingUser}
             className="flex items-center gap-2 cursor-pointer"
           >
