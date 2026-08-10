@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import {
   isRouteErrorResponse,
   Links,
@@ -13,6 +14,7 @@ import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import Particles from "@/components/Particles";
 import { ClientOnly } from "@/components/client-only";
+import { warmUpApi } from "@/lib/api";
 import "./app.css";
 
 export const links: Route.LinksFunction = () => [
@@ -54,6 +56,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  // Wake the Render-hosted API as soon as anyone lands on the site, so the
+  // cold start is already under way if they head for the collab editor.
+  useEffect(() => {
+    warmUpApi();
+  }, []);
+
   return (
     <div className="relative min-h-screen w-full overflow-hidden">
       <div className="absolute inset-0 z-0 pointer-events-none">

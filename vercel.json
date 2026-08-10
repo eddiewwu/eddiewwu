@@ -1,3 +1,13 @@
 {
-	"framework": "react-router"
+	"framework": "react-router",
+	"rewrites": [
+		{
+			"source": "/__/auth/:path*",
+			"destination": "https://personal-project-df9dc.firebaseapp.com/__/auth/:path*"
+		},
+		{
+			"source": "/__/firebase/:path*",
+			"destination": "https://personal-project-df9dc.firebaseapp.com/__/firebase/:path*"
+		}
+	]
 }

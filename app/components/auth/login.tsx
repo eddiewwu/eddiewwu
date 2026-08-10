@@ -14,7 +14,9 @@ import { useAuth } from "@/context/useAuthContext";
 
 export function Login() {
   const { userProfile, loading, authError, signInWithGoogle, signOut } = useAuth();
-  // signInWithGoogle navigates away, so this only covers the redirect gap.
+  // Covers the gap between the click and the browser actually leaving for
+  // Google, so the button cannot be fired twice. On success the page navigates
+  // and this state dies with it; it only unwinds when sign-in fails outright.
   const [pending, setPending] = useState(false);
   const loadingUser = loading || pending;
 

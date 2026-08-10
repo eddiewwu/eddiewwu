@@ -1,59 +1,47 @@
 import type { ReactNode } from "react";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import type { Session } from "@supabase/supabase-js";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import {
+  getRedirectResult,
+  onAuthStateChanged,
+  signInWithRedirect,
+  signOut as firebaseSignOut,
+  type User,
+} from "firebase/auth";
 import type { UserProfile } from "@/types/auth";
-import { supabase } from "@/lib/supabase";
+import { createGoogleProvider, getFirebaseAuth } from "@/firebaseConfig";
+import { api, clearToken, setToken, SITE_JWT_KEY } from "@/lib/api";
 
 interface AuthContextValue {
-  session: Session | null;
   userProfile: UserProfile | null;
-  /** True until the initial session lookup settles. */
+  /** This site's own JWT, exchanged from the Firebase ID token. Gates the collab socket. */
+  siteJwt: string | null;
+  /** True until the initial Firebase auth state resolves. */
   loading: boolean;
-  /** Message from a failed OAuth round trip, e.g. signups being disabled. */
+  /** Message from a failed sign-in, e.g. a blocked popup or missing config. */
   authError: string | null;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
+  /** Returns the site JWT, minting one if this session does not have it yet. */
+  ensureSiteJwt: () => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
-  session: null,
   userProfile: null,
+  siteJwt: null,
   loading: true,
   authError: null,
   signInWithGoogle: async () => {},
   signOut: async () => {},
+  ensureSiteJwt: async () => null,
 });
 
-/**
- * A rejected OAuth round trip comes back as query params (PKCE) or hash params
- * (implicit) on the redirect URL, not as a thrown error. Without reading them
- * the UI just shows a signed-out state and no explanation.
- */
-function readOAuthError(): string | null {
-  if (typeof window === "undefined") return null;
-  const query = new URLSearchParams(window.location.search);
-  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-  const code = query.get("error") ?? hash.get("error");
-  if (!code) return null;
-
-  const description =
-    query.get("error_description") ?? hash.get("error_description");
-  const message = (description ?? code).replace(/\+/g, " ");
-
-  // Strip the error params so a refresh doesn't resurrect a stale message.
-  const url = new URL(window.location.href);
-  ["error", "error_code", "error_description"].forEach((k) =>
-    url.searchParams.delete(k)
-  );
-  if (url.hash.includes("error")) url.hash = "";
-  window.history.replaceState({}, "", url.toString());
-
-  return message;
-}
+const NOT_CONFIGURED =
+  "Sign-in is unavailable: Firebase is not configured. Check the VITE_FIREBASE_* environment variables.";
 
 /**
- * Stable per-user cursor colour. Random-per-session meant your colour changed
- * on every sign-in; hashing the user id keeps it consistent across devices.
+ * Stable per-user cursor colour. Deriving it from the uid keeps it consistent
+ * across sessions and devices; the original implementation picked a random
+ * colour on every sign-in, so your cursor changed identity constantly.
  */
 function colorForUser(id: string): string {
   let hash = 0;
@@ -64,88 +52,188 @@ function colorForUser(id: string): string {
   return `hsl(${Math.abs(hash) % 360}, 70%, 55%)`;
 }
 
-function toProfile(session: Session | null): UserProfile | null {
-  if (!session?.user) return null;
-  const { user } = session;
-  const meta = user.user_metadata ?? {};
+function toProfile(user: User | null): UserProfile | null {
+  if (!user) return null;
   return {
-    name: meta.full_name || meta.name || user.email || "Guest",
+    name: user.displayName || user.email || "Guest",
     email: user.email || "",
-    avatar: meta.avatar_url || meta.picture || undefined,
-    color: colorForUser(user.id),
+    avatar: user.photoURL || undefined,
+    color: colorForUser(user.uid),
   };
 }
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [authError, setAuthError] = useState<string | null>(null);
+/**
+ * Firebase reports user-initiated cancellation as an error. Someone who backed
+ * out of the Google account chooser does not need to be told they did, so those
+ * map to no error at all.
+ */
+function describeAuthError(err: unknown): string | null {
+  const code = (err as { code?: string })?.code ?? "";
+  switch (code) {
+    case "auth/user-cancelled":
+    case "auth/no-auth-event":
+      return null;
+    case "auth/network-request-failed":
+      return "Could not reach Google. Check your connection and try again.";
+    case "auth/unauthorized-domain":
+      return "This domain is not authorised in the Firebase console.";
+    case "auth/account-exists-with-different-credential":
+      return "An account already exists with this email under a different sign-in method.";
+    default:
+      return err instanceof Error ? err.message : "Sign-in failed.";
+  }
+}
 
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  // Resolved once, in the browser only. On the server this is null and the
+  // provider renders a settled signed-out state rather than a spinner.
+  const [auth] = useState(getFirebaseAuth);
+
+  const [user, setUser] = useState<User | null>(null);
+  const [siteJwt, setSiteJwtState] = useState<string | null>(null);
+  const [resolved, setResolved] = useState(false);
+  const [redirectSettled, setRedirectSettled] = useState(false);
+  const [signInError, setSignInError] = useState<string | null>(null);
+
+  // Derived, not stored: with no auth instance neither `onAuthStateChanged` nor
+  // `getRedirectResult` ever runs, so a stored flag would leave the UI spinning
+  // forever. Both must settle -- on the load that returns from Google,
+  // `onAuthStateChanged` can report null before the redirect is processed, and
+  // gating on it alone flashes a signed-out header before flipping.
+  const loading = !!auth && (!resolved || !redirectSettled);
+  const authError = signInError ?? (auth ? null : NOT_CONFIGURED);
+
+  const setSiteJwt = useCallback((jwt: string | null) => {
+    setSiteJwtState(jwt);
+    if (jwt) setToken(jwt);
+    else clearToken();
+  }, []);
+
+  /**
+   * sessionStorage is the source of truth rather than the state value, so a
+   * caller holding a stale closure cannot trigger a redundant exchange.
+   */
+  const ensureSiteJwt = useCallback(async (): Promise<string | null> => {
+    const stored = sessionStorage.getItem(SITE_JWT_KEY);
+    if (stored) {
+      setSiteJwtState(stored);
+      return stored;
+    }
+
+    const current = auth?.currentUser;
+    if (!current) return null;
+
+    try {
+      const idToken = await current.getIdToken();
+      const { token } = await api.login(idToken);
+      setSiteJwt(token as string);
+      return token as string;
+    } catch (err) {
+      // The backend is on Render's free tier and cold-starts slowly, so this is
+      // worth logging rather than failing silently into a dead socket.
+      console.error("Site JWT exchange failed:", err);
+      return null;
+    }
+  }, [auth, setSiteJwt]);
+
+  /**
+   * Completes a redirect sign-in on the load that comes back from Google.
+   *
+   * `onAuthStateChanged` alone would report the resulting user, but only this
+   * surfaces a *failed* redirect: without it a rejected sign-in is swallowed and
+   * the visitor simply lands back on a signed-out page with no explanation.
+   * Resolves to null on an ordinary page load, which is not an error.
+   */
   useEffect(() => {
+    if (!auth) return;
     let active = true;
 
-    // Read before anything else: supabase-js rewrites the URL during its own
-    // redirect handling.
-    setAuthError(readOAuthError());
+    getRedirectResult(auth)
+      .catch((err) => {
+        if (!active) return;
+        const message = describeAuthError(err);
+        if (message) {
+          console.error("Redirect sign-in error:", err);
+          setSignInError(message);
+        }
+      })
+      .finally(() => {
+        if (active) setRedirectSettled(true);
+      });
 
-    // getSession resolves from storage immediately, then onAuthStateChange
-    // takes over (including the PKCE exchange after the OAuth redirect).
-    supabase.auth.getSession().then(({ data }) => {
+    return () => {
+      active = false;
+    };
+  }, [auth]);
+
+  // Firebase replays the persisted session through this on load, so it covers
+  // "already signed in" as well as every later sign-in and sign-out.
+  useEffect(() => {
+    if (!auth) return;
+    let active = true;
+
+    const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
       if (!active) return;
-      setSession(data.session);
-      setLoading(false);
-    });
+      setUser(nextUser);
+      setResolved(true);
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
-      setLoading(false);
+      if (!nextUser) {
+        setSiteJwt(null);
+        return;
+      }
+      await ensureSiteJwt();
     });
 
     return () => {
       active = false;
-      subscription.unsubscribe();
+      unsubscribe();
     };
-  }, []);
+  }, [auth, ensureSiteJwt, setSiteJwt]);
 
-  // Realtime authorises private channels off the current access token, so it
-  // has to be refreshed alongside the session or channel joins start failing
-  // once the first token expires.
-  useEffect(() => {
-    supabase.realtime.setAuth(session?.access_token ?? null);
-  }, [session?.access_token]);
-
-  const signInWithGoogle = async () => {
-    setAuthError(null);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        // Come back to whichever page the header button was clicked from.
-        redirectTo: window.location.href,
-        queryParams: { prompt: "select_account" },
-      },
-    });
-    if (error) {
-      console.error("Sign-in error:", error.message);
-      setAuthError(error.message);
+  const signInWithGoogle = useCallback(async () => {
+    if (!auth) return;
+    setSignInError(null);
+    try {
+      // Navigates away, so this normally never resolves; the flow resumes in the
+      // `getRedirectResult` effect above when Google sends the visitor back.
+      // Rejects without navigating when the config itself is wrong (an
+      // unauthorised domain, say), which is the case worth reporting.
+      await signInWithRedirect(auth, createGoogleProvider());
+    } catch (err) {
+      const message = describeAuthError(err);
+      if (message) {
+        console.error("Sign-in error:", err);
+        setSignInError(message);
+      }
     }
-  };
+  }, [auth]);
 
-  const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) console.error("Sign-out error:", error.message);
-  };
+  const signOut = useCallback(async () => {
+    if (!auth) return;
+    try {
+      await firebaseSignOut(auth);
+      setSiteJwt(null);
+    } catch (err) {
+      console.error("Sign-out error:", err);
+    }
+  }, [auth, setSiteJwt]);
 
-  const userProfile = useMemo(() => toProfile(session), [session]);
+  const userProfile = useMemo(() => toProfile(user), [user]);
 
-  return (
-    <AuthContext.Provider
-      value={{ session, userProfile, loading, authError, signInWithGoogle, signOut }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo(
+    () => ({
+      userProfile,
+      siteJwt,
+      loading,
+      authError,
+      signInWithGoogle,
+      signOut,
+      ensureSiteJwt,
+    }),
+    [userProfile, siteJwt, loading, authError, signInWithGoogle, signOut, ensureSiteJwt]
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
 export const useAuth = () => useContext(AuthContext);

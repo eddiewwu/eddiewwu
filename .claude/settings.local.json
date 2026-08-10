@@ -3,7 +3,17 @@
     "allow": [
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(bun run:*)"
+      "Bash(bun run:*)",
+      "WebFetch(domain:jamesperalta.com)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)",
+      "WebFetch(domain:www.credly.com)",
+      "PowerShell(bun run lint)",
+      "PowerShell(& \"C:\\\\Users\\\\eddie\\\\.bun\\\\bin\\\\bun.exe\" run lint)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(JSON.stringify\\(p.scripts,null,1\\)\\)\")",
+      "PowerShell(& \"C:\\\\Users\\\\eddie\\\\.bun\\\\bin\\\\bun.exe\" run typecheck)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); const d={...p.dependencies,...p.devDependencies}; for\\(const k of Object.keys\\(d\\)\\) if\\(/firebase|supabase|yjs|y-/.test\\(k\\)\\) console.log\\(k, d[k]\\)\")",
+      "Bash(node -e ' *)"
     ]
   }
 }

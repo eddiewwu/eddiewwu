@@ -3,9 +3,9 @@
   "configurations": [
     {
       "name": "dev",
-      "runtimeExecutable": "bun",
-      "runtimeArgs": ["run", "dev"],
-      "port": 5173
+      "runtimeExecutable": "C:\\Users\\eddie\\.bun\\bin\\bun.exe",
+      "runtimeArgs": ["run", "dev", "--port", "5199", "--strictPort"],
+      "port": 5199
     }
   ]
 }

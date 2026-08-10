@@ -22,11 +22,11 @@ const statusDot = {
 } as const;
 
 export const CollabEditor = () => {
-    const { session, userProfile, loading, authError } = useAuth();
+    const { userProfile, siteJwt, loading, authError } = useAuth();
     const [roomInput, setRoomInput] = useState("");
     const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
     const { onEditorMount, users, status } = useCollab(
-        session?.access_token ?? null,
+        siteJwt,
         userProfile,
         activeRoomId
     );
@@ -44,9 +44,10 @@ export const CollabEditor = () => {
         </h1>
     );
 
-    // GUARD 1: Auth check. Supabase owns the session, so there is no token
-    // exchange to retry here anymore.
-    if (loading || !session) {
+    // GUARD 1: Auth check. Being signed in is enough to get past this; the
+    // site-JWT exchange that actually authorises the socket happens in the
+    // background and surfaces through `status` below.
+    if (loading || !userProfile) {
         return (
             <div className="p-10">
                 {Header}
@@ -56,7 +57,7 @@ export const CollabEditor = () => {
                             <CardTitle>Checking your session…</CardTitle>
                         ) : authError ? (
                             <>
-                                <CardTitle>Sign-in failed.</CardTitle>
+                                <CardTitle>Sign-in unavailable.</CardTitle>
                                 <CardDescription className="text-destructive">
                                     {authError}
                                 </CardDescription>
@@ -147,6 +148,13 @@ export const CollabEditor = () => {
                     )}
                 </span>
             </div>
+
+            {status !== 'connected' && (
+                <p className="mb-4 text-center text-xs text-muted-foreground">
+                    The collab backend sleeps when idle, so the first connection can take
+                    around 30 seconds to wake it.
+                </p>
+            )}
 
             <div className="border rounded-xl overflow-hidden shadow-2xl">
                 <Editor

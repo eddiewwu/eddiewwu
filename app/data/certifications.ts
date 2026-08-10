@@ -18,4 +18,10 @@ export const certifications: Certification[] = [
     date: "Sept 2024",
     link: "https://cp.certmetrics.com/amazon/en/public/verify/credential/0d950334eca3480786a8f5c40f3b1df7",
   },
+  {
+    title: "AWS Certified Solutions Architect – Professional",
+    issuer: "Amazon Web Services",
+    date: "Aug 2026",
+    link: "https://www.credly.com/badges/5d87875a-4582-465d-9fbe-74b0d407b3f7",
+  },
 ];

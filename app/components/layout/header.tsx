@@ -19,21 +19,25 @@ export function Header() {
 
         {/* LEFT SIDE: Navigation */}
         <div className="flex flex-1 items-center justify-start gap-6">
-          <nav className="flex items-center space-x-1">
+          {/* Four labelled links overflow a 375px viewport and get clipped by
+              the root's overflow-hidden, so below `sm` this collapses to icons.
+              aria-label carries the accessible name either way. */}
+          <nav className="flex items-center space-x-0.5 sm:space-x-1">
             {navItems.map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
                 to={to}
+                aria-label={label}
                 className={({ isActive }) =>
                   cn(
                     buttonVariants({ variant: "ghost", size: "sm" }),
-                    "rounded-full px-4",
+                    "rounded-full px-2.5 sm:px-4",
                     isActive && "bg-accent text-accent-foreground"
                   )
                 }
               >
                 <Icon className="h-6 w-6 text-primary" />
-                {label}
+                <span className="hidden sm:inline">{label}</span>
               </NavLink>
             ))}
           </nav>

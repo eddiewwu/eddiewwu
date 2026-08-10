@@ -11,77 +11,93 @@ Welcome to my portfolio! Live at [eddiewwu.vercel.app](https://eddiewwu.vercel.a
 ## Running locally
 
 1. `bun install`
-2. Add your env variables to `.env`:
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_ANON_KEY`
+2. Copy `.env.example` to `.env` and fill in the Firebase web app config
+   (Firebase console → Project settings → Your apps).
 3. `bun run dev`
 
 Other scripts:
 
 ```bash
-bun run build      # prerender + production build to build/client/
+bun run build      # production build to build/
 bun run typecheck  # react-router typegen + tsc
+bun run lint       # eslint
 bun run preview    # serve the production build locally
 ```
 
-There is no separate backend service. Supabase provides auth and the realtime
-transport; everything else is static.
+The frontend talks to a small backend hosted on Render
+(`eddiewwu-backend.onrender.com`). It does two things: exchanges a Firebase ID
+token for this site's own JWT, and hosts the y-websocket server the collab
+editor syncs through. Point `VITE_API_URL` / `VITE_COLLAB_SERVER_URL` at
+`localhost:8080` to run against a local copy.
+
+> Render's free tier spins the backend down when idle and the cold start runs
+> north of 20 seconds, which is why `warmUpApi()` fires on page load — the
+> clock starts while the visitor reads the homepage rather than when they open
+> the editor.
 
 ## Auth flow
 
-Sign in with Google via Supabase Auth (OAuth redirect, PKCE). Supabase issues the
-session directly, so there is no token-exchange hop and no bespoke site JWT: the
-Supabase access token is what gates the collab editor and authorises Realtime
-channels. Any Google account can sign in, there is no access code.
+Sign in with Google via Firebase Auth, using `signInWithPopup`. Redirect
+sign-in never survived this Vite setup, which is what drove the move to popup in
+the first place. Any Google account can sign in, there is no access code.
 
-Sign-in is a full-page redirect rather than the old Firebase popup. The user
-returns to whichever page they started from, and `detectSessionInUrl` strips the
-PKCE code on hydration.
+Firebase is only the identity provider. The token that actually authorises
+anything is this site's own JWT: on sign-in the Firebase ID token is POSTed to
+`/api/auth/login`, and the JWT that comes back lives in `sessionStorage` and
+gates the collab socket. `ensureSiteJwt()` in `app/context/useAuthContext.tsx`
+owns that exchange.
 
 ## Realtime collaboration
 
-The editor syncs Yjs documents over Supabase Realtime **broadcast** rather than a
-WebSocket server. `app/lib/yjs-realtime-provider.ts` implements the transport:
-peers exchange state vectors on join, then stream merged incremental updates and
-awareness (cursor) state.
+The editor syncs Yjs documents through a `y-websocket` server on the Render
+backend. A server-side peer holds the authoritative document, so joining an
+existing room gets you its current contents.
 
-The tradeoff versus the old `y-websocket` server: no server-side peer holds the
-authoritative document, so **joining an empty room starts from a blank
-document**. For an explicitly ephemeral editor that is the intended semantic, but
-it is a behaviour change. Persisting updates to a Postgres table would restore
-the old behaviour if that ever matters.
+Connections are authorised by a **single-use ticket**, not by the site JWT
+directly: `app/hooks/useCollab.ts` calls `/api/auth/ws-ticket`, passes the
+ticket as a query param, and mints a fresh one on every reconnect. A ticket dies
+the moment the server accepts it, so without that refresh the provider would
+retry forever with a spent ticket and 401 every time.
 
-Rooms use private channels, so joining is gated by RLS on `realtime.messages`
-(see `supabase/migrations/`). Applying that migration is required, since a
-private-channel join is denied by default.
+Connection is keyed on the site JWT rather than started from the editor's mount
+callback, because the JWT arrives asynchronously — and slowly, on a cold
+backend. Starting from mount meant a room joined before the exchange finished
+never connected at all.
+
+> **Note:** the blog post [Building the Ephemeral Collab Editor](https://eddiewwu.vercel.app/blog/building-the-ephemeral-collab-editor)
+> describes a later iteration that ran Yjs over Supabase Realtime broadcast with
+> no server-side peer. That transport has been reverted, so the post no longer
+> matches the code.
 
 ## Deployment
 
 - **Vercel:** zero-config. The React Router preset deploys the SSR server as a serverless function and `build/client/` as static assets. Set the `VITE_*` env vars in the Vercel project settings (they're baked in at build time).
-- **Supabase:** enable the Google auth provider, add `https://<project-ref>.supabase.co/auth/v1/callback` to the Google Cloud OAuth client, and allow-list the site + preview URLs under Auth → URL Configuration. Apply `supabase/migrations/` for the Realtime RLS policies.
+- **Firebase:** enable the Google sign-in provider, and add the site + preview domains under Authentication → Settings → Authorized domains. Popup sign-in fails on any domain not listed there.
+- **Render:** the backend verifies Firebase ID tokens, issues site JWTs and WebSocket tickets, and runs the y-websocket server.
 - Self-host alternative: `bun run build && bun run start` (`react-router-serve`).
 
 ## Tech Stack
 
 - **React** - UI library
 - **TypeScript** - Type safety
-- **React Router v7 (framework mode)** - Routing + build-time prerendering for SEO
+- **React Router v7 (framework mode)** - Routing + SSR
 - **Vite** - Build tool
 - **Tailwind CSS** - Styling
 - **Bun** - Package manager
 - **Shadcn/UI** - UI component library
 - **Lucide React** - Icons
-- **Supabase** - Authentication (Google OAuth) + Realtime transport
-- **Yjs** - Real-time collaboration (CRDT)
+- **Firebase Auth** - Google sign-in
+- **Yjs + y-websocket** - Real-time collaboration (CRDT)
 - **Monaco Editor** - Code editor
 
 ## Architecture notes
 
 - The app is **server-side rendered** (React Router v7 framework mode, `ssr: true`): every route ships real HTML on first request, so crawlers and social bots see full content. Per-route meta (Open Graph, canonical, JSON-LD) lives in each route module; `sitemap.xml` is a resource route and `robots.txt` is static.
 - `/collaborate` SSRs only a loading shell: the Monaco/Yjs code is browser-only, lazy-loaded behind a hydration gate (`app/components/client-only.tsx`), so SSR and the realtime editor coexist.
-- `app/lib/supabase.ts` throws at import time if the `VITE_SUPABASE_*` vars are missing. That fails the build rather than shipping a bundle that only breaks once a visitor tries to sign in.
 - Unknown routes render the 404 page with a real 404 status (loader in `app/routes/not-found.tsx`).
-- Auth state lives in a single `AuthProvider` context (`app/context/useAuthContext.tsx`) — no prop drilling.
+- Auth state lives in a single `AuthProvider` context (`app/context/useAuthContext.tsx`) — no prop drilling. It exposes `loading` and `authError` so the UI can tell "checking your session" apart from "signed out", and a blocked popup apart from a cancelled one.
+- Cursor colours are **derived from the user's uid**, not random per session, so your colour is the same on every device and every sign-in.
+- `app/lib/api.ts` falls back to the deployed backend URL in production builds and localhost in dev, so a missing `VITE_API_URL` can never ship a bundle pointing at localhost.
 - Build output: `build/client/` (assets) + `build/server/` (SSR bundle).
 
 ## Lessons Learned
@@ -101,6 +117,8 @@ private-channel join is denied by default.
     *(Update: implemented — see `AuthProvider` above. Past me was right.)*
 -   A pure client-rendered SPA is invisible to crawlers — view-source was an empty `<div id="root">`.
     Migrated React Router v7 from library mode to framework mode with `ssr: false` + a `prerender` list: public pages ship as real HTML at build time, while the collab editor stays fully client-side behind a SPA fallback. Best of both without paying for a server.
+-   Briefly moved auth and the collab transport onto Supabase, then moved back.
+    Supabase pauses free projects for inactivity, which is a bad property for a portfolio nobody visits for a month at a time. Firebase Auth plus the existing Render backend has no such failure mode.
 
 ### Ephemeral Online Collab Editor
 

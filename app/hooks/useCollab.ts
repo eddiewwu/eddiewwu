@@ -1,24 +1,28 @@
 import { useCallback, useEffect, useState } from "react";
 import * as Y from "yjs";
-import { Awareness } from "y-protocols/awareness";
+import { WebsocketProvider } from "y-websocket";
 import { MonacoBinding } from "y-monaco";
 import type { editor } from "monaco-editor";
 import type { UserProfile } from "@/types/auth";
-import { supabase } from "@/lib/supabase";
-import {
-  SupabaseRealtimeProvider,
-  type ProviderStatus,
-} from "@/lib/yjs-realtime-provider";
+import { api } from "@/lib/api";
+
+export type ProviderStatus = "connecting" | "connected" | "disconnected";
+
+// Same missing-env fallback story as lib/api.ts -- never undefined in a prod bundle.
+const WS_URL =
+  import.meta.env.VITE_COLLAB_SERVER_URL ||
+  (import.meta.env.PROD ? "wss://eddiewwu-backend.onrender.com" : "ws://localhost:8080");
 
 const CURSOR_STYLE_ID = "yjs-cursor-styles";
+const TICKET_RETRY_MS = 3_000;
 
 /** CSS `content` is a string literal: a stray quote or backslash breaks out of it. */
 function cssString(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
-function renderCursorStyles(awareness: Awareness) {
-  const localId = awareness.clientID;
+function renderCursorStyles(provider: WebsocketProvider) {
+  const localId = provider.awareness.clientID;
   let element = document.getElementById(CURSOR_STYLE_ID);
   if (!element) {
     element = document.createElement("style");
@@ -27,7 +31,7 @@ function renderCursorStyles(awareness: Awareness) {
   }
 
   let css = "";
-  awareness.getStates().forEach((state, clientId) => {
+  provider.awareness.getStates().forEach((state, clientId) => {
     if (clientId === localId || !state.user) return;
     const { color, name } = state.user as UserProfile;
     if (!color || !name) return;
@@ -56,80 +60,110 @@ function renderCursorStyles(awareness: Awareness) {
   element.textContent = css;
 }
 
+/**
+ * Collaborative editing over the Render-hosted y-websocket server.
+ *
+ * Connection is keyed on the site JWT rather than started from the editor's
+ * mount callback. The JWT arrives asynchronously -- and slowly, when Render has
+ * spun the backend down -- so starting from the mount would mean a room joined
+ * before the exchange finished never connected at all.
+ */
 export const useCollab = (
-  accessToken: string | null,
+  siteJwt: string | null,
   userProfile: UserProfile | null,
   activeRoomId: string | null
 ) => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [status, setStatus] = useState<ProviderStatus>("connecting");
-  const [synced, setSynced] = useState(false);
-
   const [editorInstance, setEditorInstance] =
     useState<editor.IStandaloneCodeEditor | null>(null);
-  const [provider, setProvider] = useState<SupabaseRealtimeProvider | null>(null);
+  const [provider, setProvider] = useState<WebsocketProvider | null>(null);
 
-  // ── Connection lifecycle, keyed on the room ───────────────────────────────
+  // ── Connection lifecycle, keyed on the room and the token ─────────────────
   useEffect(() => {
-    if (!accessToken || !activeRoomId) return;
+    if (!siteJwt || !activeRoomId) return;
 
     const doc = new Y.Doc();
-    const awareness = new Awareness(doc);
-    let provider: SupabaseRealtimeProvider | null = null;
-    let offStatus: (() => void) | undefined;
-    let offSynced: (() => void) | undefined;
-    let cancelled = false;
+    let active = true;
+    let current: WebsocketProvider | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
-    // One handler owns both the roster and the cursor styles. The previous
-    // version registered two competing listeners that each called setUsers.
+    // One handler owns both the roster and the cursor styles. The original
+    // registered two competing awareness listeners that each called setUsers.
     const onAwarenessChange = () => {
-      const localId = awareness.clientID;
+      if (!current) return;
+      const localId = current.awareness.clientID;
       setUsers(
-        Array.from(awareness.getStates().entries())
+        Array.from(current.awareness.getStates().entries())
           .filter(([clientId]) => clientId !== localId)
           .map(([, state]) => state.user as UserProfile | undefined)
           .filter((u): u is UserProfile => !!u?.name)
       );
-      renderCursorStyles(awareness);
+      renderCursorStyles(current);
     };
-    awareness.on("change", onAwarenessChange);
 
-    // Realtime evaluates RLS against whatever token the socket carries. React
-    // runs child effects before parent ones, so this effect fires before the
-    // AuthProvider has pushed the session token down. Without awaiting it here
-    // the channel joins as `anon` and every policy scoped to `authenticated`
-    // denies it, which surfaces as a permanent "Disconnected".
-    (async () => {
-      await supabase.realtime.setAuth(accessToken);
-      if (cancelled) return;
+    /**
+     * Tickets are single-use: the one used to connect died the moment the
+     * server accepted it. On any drop, pause auto-reconnect, mint a fresh
+     * ticket, then resume -- otherwise the provider retries forever with a
+     * spent ticket and every attempt 401s.
+     */
+    const refreshTicketAndReconnect = async () => {
+      if (!active || !current) return;
+      current.shouldConnect = false;
+      try {
+        const { ticket } = await api.wsTicket();
+        if (!active || !current) return;
+        current.params.ticket = ticket as string;
+        current.connect();
+      } catch (err) {
+        console.error("WebSocket ticket refresh failed, retrying:", err);
+        retryTimer = setTimeout(refreshTicketAndReconnect, TICKET_RETRY_MS);
+      }
+    };
 
-      const next = new SupabaseRealtimeProvider({
-        supabase,
-        room: activeRoomId,
-        doc,
-        awareness,
+    void (async () => {
+      let ticket: string;
+      try {
+        ticket = (await api.wsTicket()).ticket as string;
+      } catch (err) {
+        console.error("WebSocket ticket fetch failed:", err);
+        if (active) setStatus("disconnected");
+        return;
+      }
+      if (!active) return;
+
+      // The room id is the URL path because that is what the server keys docs
+      // on; the ticket rides as a query param so it can be swapped between
+      // connection attempts.
+      const next = new WebsocketProvider(WS_URL, activeRoomId, doc, {
+        params: { ticket },
       });
-      provider = next;
+      current = next;
       setProvider(next);
-      setStatus(next.status);
-      setSynced(next.synced);
-      offStatus = next.onStatus(setStatus);
-      offSynced = next.onSynced(setSynced);
+
+      next.awareness.on("change", onAwarenessChange);
+      next.on("status", ({ status: nextStatus }: { status: ProviderStatus }) =>
+        setStatus(nextStatus)
+      );
+      next.on("connection-close", refreshTicketAndReconnect);
+      next.on("connection-error", (err: unknown) =>
+        console.error("WebSocket connection error:", err)
+      );
     })();
 
     return () => {
-      cancelled = true;
-      awareness.off("change", onAwarenessChange);
-      offStatus?.();
-      offSynced?.();
-      provider?.destroy();
-      awareness.destroy();
+      active = false;
+      if (retryTimer) clearTimeout(retryTimer);
+      current?.awareness.off("change", onAwarenessChange);
+      current?.destroy();
+      current = null;
       doc.destroy();
       setProvider(null);
       setUsers([]);
       document.getElementById(CURSOR_STYLE_ID)?.remove();
     };
-  }, [accessToken, activeRoomId]);
+  }, [siteJwt, activeRoomId]);
 
   // ── Local cursor identity ─────────────────────────────────────────────────
   useEffect(() => {
@@ -160,5 +194,5 @@ export const useCollab = (
     []
   );
 
-  return { onEditorMount, users, status, synced };
+  return { onEditorMount, users, status };
 };
