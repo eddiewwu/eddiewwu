@@ -13,7 +13,8 @@
       "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(JSON.stringify\\(p.scripts,null,1\\)\\)\")",
       "PowerShell(& \"C:\\\\Users\\\\eddie\\\\.bun\\\\bin\\\\bun.exe\" run typecheck)",
       "Bash(node -e \"const p=require\\('./package.json'\\); const d={...p.dependencies,...p.devDependencies}; for\\(const k of Object.keys\\(d\\)\\) if\\(/firebase|supabase|yjs|y-/.test\\(k\\)\\) console.log\\(k, d[k]\\)\")",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(git rm *)"
     ]
   }
 }

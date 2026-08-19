@@ -5,13 +5,14 @@ import { MonacoBinding } from "y-monaco";
 import type { editor } from "monaco-editor";
 import type { UserProfile } from "@/types/auth";
 import { api } from "@/lib/api";
+import { wsOrigin } from "@/lib/origin";
 
 export type ProviderStatus = "connecting" | "connected" | "disconnected";
 
-// Same missing-env fallback story as lib/api.ts -- never undefined in a prod bundle.
-const WS_URL =
-  import.meta.env.VITE_COLLAB_SERVER_URL ||
-  (import.meta.env.PROD ? "wss://eddiewwu-backend.onrender.com" : "ws://localhost:8080");
+const WS_URL = wsOrigin(
+  import.meta.env.VITE_COLLAB_SERVER_URL,
+  import.meta.env.PROD ? "wss://eddiewwu-backend.onrender.com" : "ws://localhost:8080"
+);
 
 const CURSOR_STYLE_ID = "yjs-cursor-styles";
 const TICKET_RETRY_MS = 3_000;

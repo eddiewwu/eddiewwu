@@ -1,8 +1,13 @@
+import { httpOrigin } from "@/lib/origin";
+
 // Fallback covers a missing VITE_API_URL at build time: localhost in dev,
 // the deployed backend in production (never localhost in a prod bundle).
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  (import.meta.env.PROD ? "https://eddiewwu-backend.onrender.com" : "http://localhost:8080");
+// httpOrigin covers the other failure mode -- a value set without a scheme,
+// which fetch would otherwise resolve against this site's own origin.
+const API_URL = httpOrigin(
+  import.meta.env.VITE_API_URL,
+  import.meta.env.PROD ? "https://eddiewwu-backend.onrender.com" : "http://localhost:8080"
+);
 
 export const SITE_JWT_KEY = "site_jwt";
 
